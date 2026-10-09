@@ -1,7 +1,7 @@
 {
-  "name": "hortis",
+  "name": "ortie",
   "version": "1.0.0",
-  "description": "Hortis — le casse-tête solo du verger en 9 cartes, version web.",
+  "description": "Ortie — le casse-tête solo du verger en 9 cartes, version web installable.",
   "private": true,
   "main": "server.js",
   "scripts": {

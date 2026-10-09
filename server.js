@@ -1,4 +1,4 @@
-// Serveur statique minimal pour Hortis (aucune dépendance).
+// Serveur statique minimal pour Ortie (aucune dépendance).
 'use strict';
 const http = require('http');
 const fs = require('fs');
@@ -46,17 +46,27 @@ const server = http.createServer((req, res) => {
       return res.end('Introuvable');
     }
     const ext = path.extname(file).toLowerCase();
-    res.writeHead(200, {
+    const lastModified = st.mtime.toUTCString();
+    const headers = {
       'Content-Type': TYPES[ext] || 'application/octet-stream',
-      'Content-Length': st.size,
-      'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=3600',
+      // Code du jeu toujours revalidé (mises à jour immédiates) ; images en cache.
+      'Cache-Control': ext === '.png' ? 'public, max-age=604800' : 'no-cache',
+      'Last-Modified': lastModified,
       'X-Content-Type-Options': 'nosniff',
-    });
+    };
+    if (path.basename(file) === 'sw.js') headers['Service-Worker-Allowed'] = '/';
+    const since = req.headers['if-modified-since'];
+    if (since && Math.floor(st.mtimeMs / 1000) <= Math.floor(Date.parse(since) / 1000)) {
+      res.writeHead(304, headers);
+      return res.end();
+    }
+    headers['Content-Length'] = st.size;
+    res.writeHead(200, headers);
     if (req.method === 'HEAD') return res.end();
     fs.createReadStream(file).pipe(res);
   });
 });
 
 server.listen(PORT, HOST, () => {
-  console.log(`Hortis prêt sur http://${HOST}:${PORT}`);
+  console.log(`Ortie prêt sur http://${HOST}:${PORT}`);
 });

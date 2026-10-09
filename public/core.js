@@ -1,9 +1,9 @@
 /*
- * Hortis — moteur de règles (partagé navigateur / Node).
+ * Ortie — moteur de règles (partagé navigateur / Node).
  *
- * Règles implémentées (jeu solo de 9 cartes de Mark Tuck, éd. Origames) :
- *  - 18 cartes Verger de 2 × 3 cases : 5 arbres (orangers, citronniers,
- *    citronniers verts ; 1 ou 2 fruits) et 1 clairière.
+ * Jeu solo de 9 cartes de Mark Tuck (éd. Origames) :
+ *  - 18 cartes Verger de 3 × 2 cases : 5 arbres (orangers, citronniers jaunes,
+ *    citronniers verts ; 1 ou 2 fruits) et 1 clairière portant le numéro.
  *  - Partie : 9 cartes. 1 carte de départ, 2 cartes en main, pioche de 6.
  *  - Tour : poser une carte (orientable à 90° / 180°) alignée sur la grille,
  *    qui recouvre au moins une case du Verger, puis piocher.
@@ -18,23 +18,61 @@
  *  - Plus de dé en réserve → aucun dé placé.
  *  - Fin : 9e carte posée (ou aucun coup possible). Score = somme des dés sur
  *    des arbres ; un dé sur une clairière ne rapporte rien.
+ *  - Recettes (verso des cartes) : 2 cartes, objectif = somme des nombres.
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
-  else root.HortisCore = factory();
+  else root.OrtieCore = factory();
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
   const TYPES = ['orange', 'citron', 'vert'];
   const TYPE_LABEL = { orange: 'Oranger', citron: 'Citronnier', vert: 'Citronnier vert' };
   const FRUIT_LABEL = { orange: 'Oranges', citron: 'Citrons jaunes', vert: 'Citrons verts' };
+  const DIE_LABEL = { orange: 'orange', citron: 'jaune', vert: 'vert' };
   const DICE_PER_TYPE = 5;
   const BASKET = 10;
   const BARROW = 15;
-  const CARD_W = 2;
-  const CARD_H = 3;
+  const CARD_W = 3;
+  const CARD_H = 2;
   const GAME_CARDS = 9;
   const HAND_SIZE = 2;
+
+  // Les 18 cartes Verger, relevées sur le jeu : rangée du haut puis rangée du bas.
+  // O = oranger, Y = citronnier jaune, G = citronnier vert, chiffre = nombre de fruits,
+  // C = clairière (où est imprimé le numéro de la carte).
+  const CARD_DATA = {
+    1: 'Y2 C G1 / G1 O2 O1',
+    2: 'G2 O1 O1 / C G1 Y2',
+    3: 'O1 O2 Y1 / C G2 Y1',
+    4: 'C Y1 G2 / Y1 G1 O2',
+    5: 'O2 Y1 Y1 / C O1 G2',
+    6: 'G2 O1 G1 / O1 C Y2',
+    7: 'C G1 O1 / O2 Y2 G1',
+    8: 'Y2 G1 G1 / C Y1 O2',
+    9: 'O2 C Y1 / Y1 G2 G1',
+    10: 'O2 C G1 / Y1 G1 Y2',
+    11: 'G1 O2 C / G1 Y2 Y1',
+    12: 'Y2 O1 G1 / O2 G1 C',
+    13: 'C O1 Y1 / Y2 G2 O1',
+    14: 'Y1 O2 G2 / G1 Y1 C',
+    15: 'G2 Y1 O1 / Y2 O1 C',
+    16: 'O2 Y1 O1 / Y1 C G2',
+    17: 'O1 Y2 C / O1 G2 G1',
+    18: 'G2 C O1 / O1 Y2 Y1',
+  };
+  const LETTER = { O: 'orange', Y: 'citron', G: 'vert' };
+
+  const CARDS = Object.keys(CARD_DATA).map(Number).sort((a, b) => a - b).map((id) => ({
+    id,
+    cells: CARD_DATA[id].replace('/', ' ').split(/\s+/).filter(Boolean).map((c) =>
+      c === 'C' ? { k: 'clear' } : { k: 'tree', t: LETTER[c[0]], f: Number(c[1]) }
+    ),
+  }));
+
+  function cardById(id) {
+    return CARDS[id - 1];
+  }
 
   function mulberry32(a) {
     return function () {
@@ -64,30 +102,6 @@
     return arr;
   }
 
-  // Les 18 cartes Verger : chaque essence est présente 30 fois (6 cartes avec
-  // 1 arbre d'une essence, 12 avec 2), une clairière et un arbre double par carte.
-  function buildCards() {
-    const rng = mulberry32(20230127);
-    const clearPositions = [5, 0, 3, 2, 4, 1];
-    const cards = [];
-    for (let i = 0; i < 18; i++) {
-      const single = TYPES[i % 3];
-      const others = TYPES.filter((t) => t !== single);
-      const trees = shuffle([single, others[0], others[0], others[1], others[1]], rng);
-      const dbl = Math.floor(rng() * 5);
-      const cells = trees.map((t, j) => ({ k: 'tree', t, f: j === dbl ? 2 : 1 }));
-      cells.splice(clearPositions[(i + Math.floor(i / 6)) % 6], 0, { k: 'clear' });
-      cards.push({ id: i + 1, cells });
-    }
-    return cards;
-  }
-
-  const CARDS = buildCards();
-
-  function cardById(id) {
-    return CARDS[id - 1];
-  }
-
   // Cases d'une carte après rotation (rot : 0..3, quarts de tour horaires).
   function footprint(card, rot) {
     const out = [];
@@ -110,42 +124,80 @@
   const key = (x, y) => x + ',' + y;
 
   // ---------------------------------------------------------------- Recettes
-  // Variante « Recettes » : deux cartes, objectif = somme des deux nombres,
-  // bonus si la condition est remplie en fin de partie.
+  // Recto/verso relevé sur le jeu : le numéro est celui de la carte Verger.
+  // color : couleur de la pastille (null = recette commune).
   const RECIPES = [
-    { id: 1, name: 'Marmelade', target: 22, bonus: 5, text: 'Avoir au moins un Panier d’oranges.', check: (s) => diceOf(s).some((d) => d.t === 'orange' && d.v >= BASKET) },
-    { id: 2, name: 'Tarte au citron', target: 22, bonus: 5, text: 'Avoir au moins un Panier de citrons jaunes.', check: (s) => diceOf(s).some((d) => d.t === 'citron' && d.v >= BASKET) },
-    { id: 3, name: 'Mojito', target: 22, bonus: 5, text: 'Avoir au moins un Panier de citrons verts.', check: (s) => diceOf(s).some((d) => d.t === 'vert' && d.v >= BASKET) },
-    { id: 4, name: 'Jus pressé', target: 25, bonus: 6, text: 'Avoir 5 dés d’une même couleur dans le Verger.', check: (s) => TYPES.some((t) => diceOf(s).filter((d) => d.t === t && !d.barrow).length >= 5) },
-    { id: 5, name: 'Corbeille variée', target: 20, bonus: 5, text: 'Avoir au moins 3 dés de chaque couleur.', check: (s) => TYPES.every((t) => diceOf(s).filter((d) => d.t === t).length >= 3) },
-    { id: 6, name: 'Grande récolte', target: 28, bonus: 8, text: 'Placer le jeton Brouette.', check: (s) => diceOf(s).some((d) => d.barrow) },
-    { id: 7, name: 'Pique-nique', target: 18, bonus: 4, text: 'Aucun dé perdu sur une clairière.', check: (s) => lostDice(s).length === 0 },
-    { id: 8, name: 'Sorbet', target: 24, bonus: 5, text: 'Avoir 2 Paniers ou plus.', check: (s) => diceOf(s).filter((d) => d.v === BASKET).length >= 2 },
-    { id: 9, name: 'Confiture', target: 20, bonus: 4, text: 'Ne pas utiliser l’Écureuil.', check: (s) => !s.squirrelUsed },
-    { id: 10, name: 'Zeste', target: 18, bonus: 4, text: 'Avoir au moins 4 dés de valeur 6 ou plus.', check: (s) => diceOf(s).filter((d) => d.v >= 6).length >= 4 },
-    { id: 11, name: 'Agrumes confits', target: 21, bonus: 5, text: 'Avoir au moins 10 dés dans le Verger.', check: (s) => diceOf(s).length >= 10 },
-    { id: 12, name: 'Limonade', target: 23, bonus: 5, text: 'Les dés jaunes totalisent 20 ou plus.', check: (s) => sumType(s, 'citron') >= 20 },
-    { id: 13, name: 'Orangeade', target: 23, bonus: 5, text: 'Les dés orange totalisent 20 ou plus.', check: (s) => sumType(s, 'orange') >= 20 },
-    { id: 14, name: 'Citronnade verte', target: 23, bonus: 5, text: 'Les dés verts totalisent 20 ou plus.', check: (s) => sumType(s, 'vert') >= 20 },
-    { id: 15, name: 'Verger compact', target: 19, bonus: 5, text: 'Le Verger tient dans un carré de 5 × 5 cases.', check: (s) => { const b = bounds(s); return b.maxX - b.minX < 5 && b.maxY - b.minY < 5; } },
-    { id: 16, name: 'Grand verger', target: 19, bonus: 4, text: 'Le Verger s’étend sur au moins 8 cases dans une direction.', check: (s) => { const b = bounds(s); return b.maxX - b.minX >= 7 || b.maxY - b.minY >= 7; } },
-    { id: 17, name: 'Clairières fleuries', target: 17, bonus: 4, text: 'Au moins 4 clairières visibles dans le Verger.', check: (s) => Object.values(s.board).filter((e) => e.cell.k === 'clear').length >= 4 },
-    { id: 18, name: 'Salade de fruits', target: 26, bonus: 6, text: 'Avoir un dé de 6 ou plus dans chaque couleur.', check: (s) => TYPES.every((t) => diceOf(s).some((d) => d.t === t && d.v >= 6)) },
+    { id: 15, name: 'Citron vert confit', target: 26, color: 'vert', icon: 'jar', kind: 'first', t: 'vert', pts: 1, text: 'Jouez un <b>dé vert</b> lors de votre premier tour' },
+    { id: 4, name: 'Confiture d’oranges', target: 26, color: 'orange', icon: 'jar', kind: 'first', t: 'orange', pts: 1, text: 'Jouez un <b>dé orange</b> lors de votre premier tour' },
+    { id: 12, name: 'Crème de citron jaune', target: 26, color: 'citron', icon: 'jar', kind: 'first', t: 'citron', pts: 1, text: 'Jouez un <b>dé jaune</b> lors de votre premier tour' },
+    { id: 11, name: 'Jus d’orange', target: 30, color: 'orange', icon: 'glass', kind: 'all5', t: 'orange', pts: 5, text: 'Les <b>5 dés orange</b> doivent être en jeu', small: 'sur des arbres ou des clairières' },
+    { id: 17, name: 'Soda au citron', target: 30, color: 'citron', icon: 'glass', kind: 'all5', t: 'citron', pts: 5, text: 'Les <b>5 dés jaunes</b> doivent être en jeu', small: 'sur des arbres ou des clairières' },
+    { id: 3, name: 'Sirop de citron vert', target: 30, color: 'vert', icon: 'glass', kind: 'all5', t: 'vert', pts: 5, text: 'Les <b>5 dés verts</b> doivent être en jeu', small: 'sur des arbres ou des clairières' },
+    { id: 6, name: 'Gelée à l’orange', target: 31, color: 'orange', icon: 'jelly', kind: 'six', t: 'orange', pts: 6, text: 'Au moins <b>1 dé orange</b> doit avoir une valeur de 6', small: 'sur un arbre ou une clairière' },
+    { id: 16, name: 'Tarte au citron meringuée', target: 31, color: 'citron', icon: 'pie', kind: 'six', t: 'citron', pts: 6, text: 'Au moins <b>1 dé jaune</b> doit avoir une valeur de 6', small: 'sur un arbre ou une clairière' },
+    { id: 10, name: 'Gelée au citron vert', target: 31, color: 'vert', icon: 'jelly', kind: 'six', t: 'vert', pts: 6, text: 'Au moins <b>1 dé vert</b> doit avoir une valeur de 6', small: 'sur un arbre ou une clairière' },
+    { id: 18, name: 'Liqueur à l’orange', target: 44, color: 'orange', icon: 'bottle', kind: 'double', t: 'orange', mult: 2, text: 'Tous <b>les dés orange</b> comptent double' },
+    { id: 9, name: 'Liqueur au citron', target: 44, color: 'citron', icon: 'bottle', kind: 'double', t: 'citron', mult: 2, text: 'Tous <b>les dés jaunes</b> comptent double' },
+    { id: 1, name: 'Tarte au citron vert', target: 44, color: 'vert', icon: 'pie', kind: 'double', t: 'vert', mult: 2, text: 'Tous <b>les dés verts</b> comptent double' },
+    { id: 7, name: 'Punch', target: 40, color: null, icon: 'punch', kind: 'punch', mult: 2, text: '<b>Le fruit rapportant le moins de points</b> (avant application des bonus) compte double' },
+    { id: 8, name: 'Cake aux fruits', target: 26, color: null, icon: 'cake', kind: 'cake', pts: 4, text: 'Au moins <b>1 clairière</b> doit être entourée <b>de 4 dés</b>', small: 'sur des arbres ou des clairières' },
+    { id: 13, name: 'Panier de fruits', target: 27, color: null, icon: 'basket', kind: 'basket', pts: 3, text: 'Au moins <b>1 panier</b> doit être en jeu', small: 'sur un arbre ou une clairière' },
+    { id: 14, name: 'Salade de fruits', target: 28, color: null, icon: 'bowl', kind: 'salad', pts: 6, text: 'Au moins <b>3 dés d’un même fruit</b> doivent être placés sur des arbres/clairières adjacents' },
+    { id: 2, name: 'Cocktail de fruits', target: 29, color: null, icon: 'cocktail', kind: 'cocktail', pts: 5, text: 'Les <b>15 dés</b> doivent être en jeu', small: 'sur des arbres ou des clairières' },
+    { id: 5, name: 'Tutti Frutti', target: 35, color: null, icon: 'cone', kind: 'tutti', pts: 10, text: 'Au moins <b>4 dés de chaque couleur</b> doivent être en jeu', small: 'sur des arbres ou des clairières' },
   ];
+  const RECIPE_BY_ID = {};
+  for (const r of RECIPES) RECIPE_BY_ID[r.id] = r;
 
-  function diceOf(state) {
+  // Dés en jeu (arbres et clairières). La Brouette est un jeton, pas un dé.
+  function diceInPlay(state) {
     const out = [];
-    for (const e of Object.values(state.board)) if (e.die && e.cell.k === 'tree') out.push(e.die);
+    for (const [k, e] of Object.entries(state.board)) if (e.die && !e.die.barrow) out.push(Object.assign({ k }, e.die));
     return out;
   }
-  function lostDice(state) {
-    const out = [];
-    for (const e of Object.values(state.board)) if (e.die && e.cell.k === 'clear') out.push(e.die);
-    return out;
+
+  function neighbours(k) {
+    const [x, y] = k.split(',').map(Number);
+    return [key(x + 1, y), key(x - 1, y), key(x, y + 1), key(x, y - 1)];
   }
-  function sumType(state, t) {
-    return diceOf(state).filter((d) => d.t === t).reduce((a, d) => a + d.v, 0);
+
+  function recipeDone(state, r) {
+    const dice = diceInPlay(state);
+    switch (r.kind) {
+      case 'first': return (state.firstTurnDice || []).includes(r.t);
+      case 'all5': return dice.filter((d) => d.t === r.t).length >= DICE_PER_TYPE;
+      case 'six': return dice.some((d) => d.t === r.t && d.v === 6);
+      case 'basket': return dice.some((d) => d.v === BASKET);
+      case 'cocktail': return dice.length >= DICE_PER_TYPE * TYPES.length;
+      case 'tutti': return TYPES.every((t) => dice.filter((d) => d.t === t).length >= 4);
+      case 'cake':
+        return Object.entries(state.board).some(([k, e]) =>
+          e.cell.k === 'clear' && neighbours(k).every((n) => state.board[n] && state.board[n].die));
+      case 'salad': {
+        // groupe orthogonal d'au moins 3 dés de la même couleur
+        const seen = new Set();
+        for (const [k, e] of Object.entries(state.board)) {
+          if (!e.die || seen.has(k)) continue;
+          const t = e.die.t;
+          let size = 0;
+          const stack = [k];
+          seen.add(k);
+          while (stack.length) {
+            const c = stack.pop();
+            size++;
+            for (const n of neighbours(c)) {
+              const ne = state.board[n];
+              if (ne && ne.die && ne.die.t === t && !seen.has(n)) { seen.add(n); stack.push(n); }
+            }
+          }
+          if (size >= 3) return true;
+        }
+        return false;
+      }
+      default: return true; // recettes « compte double » : toujours appliquées
+    }
   }
+
   function bounds(state) {
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     for (const k of Object.keys(state.board)) {
@@ -158,16 +210,25 @@
   }
 
   // ------------------------------------------------------------------- Partie
+  /**
+   * opts.recipes : true (tirage au hasard) ou tableau d'identifiants de cartes.
+   * Les cartes servant de Recettes sont retirées de la pioche.
+   */
   function newGame(seed, opts) {
     opts = opts || {};
     seed = String(seed || randomSeed());
     const rng = mulberry32(hashSeed(seed));
-    const ids = shuffle(CARDS.map((c) => c.id), rng).slice(0, GAME_CARDS);
     let recipes = null;
+    let pool = CARDS.map((c) => c.id);
     if (opts.recipes) {
-      const r = shuffle(RECIPES.map((x) => x.id), rng).slice(0, 2);
-      recipes = r;
+      if (Array.isArray(opts.recipes) && opts.recipes.length) {
+        recipes = opts.recipes.map(Number).filter((id) => RECIPE_BY_ID[id]).slice(0, 2);
+      } else recipes = [];
+      const rest = shuffle(pool.filter((id) => !recipes.includes(id)), mulberry32(hashSeed(seed + '#r')));
+      while (recipes.length < 2) recipes.push(rest.shift());
+      pool = pool.filter((id) => !recipes.includes(id));
     }
+    const ids = shuffle(pool, rng).slice(0, GAME_CARDS);
     const state = {
       seed,
       cards: ids.slice(),
@@ -178,18 +239,16 @@
       reserve: { orange: DICE_PER_TYPE, citron: DICE_PER_TYPE, vert: DICE_PER_TYPE },
       barrowFree: true,
       squirrelUsed: false,
+      firstTurnDice: null,
       recipes,
       over: false,
       endReason: null,
-      log: [],
     };
-    // Carte de départ
     const start = footprint(cardById(ids[0]), 0);
     for (const c of start.cells) {
       state.board[key(c.x, c.y)] = { cell: c.cell, card: ids[0], die: null, squirrel: false };
     }
     state.placed.push({ id: ids[0], rot: 0, x: 0, y: 0 });
-    state.log.push('Carte de départ n°' + ids[0] + ' posée.');
     return state;
   }
 
@@ -197,10 +256,14 @@
     return String(Math.floor(1000 + Math.random() * 9000));
   }
 
+  function describeTop(ex) {
+    if (ex.cell.k === 'tree') return 'un ' + TYPE_LABEL[ex.cell.t].toLowerCase();
+    return 'un dé ' + DIE_LABEL[ex.die.t];
+  }
+
   /**
    * Évalue la pose de la carte `id` (rotation `rot`) avec son coin haut-gauche
-   * en (x, y). Ne modifie pas l'état.
-   * Retourne { ok, reason, needsSquirrel, changes, reserve, barrowFree, overlaps }.
+   * en (x, y). Ne modifie pas l'état. Chaque case renvoie son effet ou son conflit.
    */
   function evaluate(state, id, rot, x, y, opts) {
     opts = opts || {};
@@ -210,9 +273,10 @@
     let barrowFree = state.barrowFree;
     let overlaps = 0;
     let squirrelAt = null;
+    let mismatches = 0;
     const changes = [];
+    const conflicts = [];
     const notes = [];
-    const fail = (reason, extra) => Object.assign({ ok: false, reason, changes, overlaps }, extra || {});
 
     for (const c of fp.cells) {
       const X = x + c.x, Y = y + c.y, k = key(X, Y);
@@ -221,10 +285,12 @@
       let die = null;
       let squirrel = false;
       let event = null;
+      let conflict = null;
       if (ex) {
         overlaps++;
-        if (ex.squirrel) return fail('L’Écureuil garde cet arbre : il ne peut plus être recouvert.');
-        if (nc.k === 'clear') {
+        if (ex.squirrel) {
+          conflict = 'L’Écureuil garde cet arbre : il ne peut plus être recouvert.';
+        } else if (nc.k === 'clear') {
           if (ex.die) { die = Object.assign({}, ex.die); event = 'move'; }
         } else {
           const below = ex.cell.k === 'tree' ? ex.cell.t : ex.die ? ex.die.t : null;
@@ -245,41 +311,67 @@
               if (v > 6) v = BASKET;
               if (ex.die) { die = { t: nc.t, v }; event = v === BASKET ? 'basket' : 'up'; }
               else if (reserve[nc.t] > 0) { reserve[nc.t]--; die = { t: nc.t, v }; event = v === BASKET ? 'basket' : 'new'; }
-              else { event = 'nodie'; notes.push('Plus de dé ' + FRUIT_LABEL[nc.t].toLowerCase() + ' en réserve.'); }
+              else { event = 'nodie'; notes.push('Plus de dé ' + DIE_LABEL[nc.t] + ' en réserve.'); }
             }
           } else {
-            if (squirrelAt) return fail('L’Écureuil ne peut aider que sur un seul arbre.');
-            if (!allowSquirrel) {
-              return fail(
-                state.squirrelUsed
-                  ? 'Un ' + TYPE_LABEL[nc.t].toLowerCase() + ' ne peut pas recouvrir ' + (ex.cell.k === 'tree' ? 'un ' + TYPE_LABEL[below].toLowerCase() : 'un dé ' + below) + '.'
-                  : 'Essences différentes : il faudrait l’aide de l’Écureuil.',
-                { needsSquirrel: !state.squirrelUsed }
-              );
+            mismatches++;
+            if (allowSquirrel && !squirrelAt) {
+              squirrelAt = k;
+              if (ex.die) {
+                if (ex.die.barrow) barrowFree = true;
+                else reserve[ex.die.t]++;
+              }
+              squirrel = true;
+              event = 'squirrel';
+            } else if (squirrelAt) {
+              conflict = 'L’Écureuil ne peut aider que pour un seul arbre.';
+            } else {
+              conflict = 'Un ' + TYPE_LABEL[nc.t].toLowerCase() + ' ne peut pas recouvrir ' + describeTop(ex) + '.';
             }
-            squirrelAt = k;
-            if (ex.die) {
-              if (ex.die.barrow) barrowFree = true;
-              else reserve[ex.die.t]++;
-            }
-            squirrel = true;
-            event = 'squirrel';
           }
         }
       }
-      changes.push({ k, x: X, y: Y, cell: nc, die, squirrel, covered: !!ex, event });
+      if (conflict) conflicts.push({ k, x: X, y: Y, reason: conflict });
+      changes.push({ k, x: X, y: Y, cell: nc, die, squirrel, covered: !!ex, event, conflict });
     }
-    if (overlaps === 0) return fail('La carte doit recouvrir au moins une case de votre Verger.');
-    return { ok: true, changes, reserve, barrowFree, overlaps, usesSquirrel: !!squirrelAt, notes };
+
+    const base = { changes, overlaps, conflicts };
+    if (overlaps === 0) return Object.assign(base, { ok: false, reason: 'La carte doit recouvrir au moins une case de votre Verger.' });
+    if (conflicts.length) {
+      const needsSquirrel = !allowSquirrel && !state.squirrelUsed && mismatches === 1 && conflicts.length === 1;
+      return Object.assign(base, {
+        ok: false,
+        needsSquirrel,
+        reason: needsSquirrel ? 'Essences différentes : il faudrait l’aide de l’Écureuil.' : conflicts[0].reason,
+      });
+    }
+    return Object.assign(base, { ok: true, reserve, barrowFree, usesSquirrel: !!squirrelAt, notes, gain: gainOf(state, changes) });
   }
+
+  // Fruits gagnés (dés sur des arbres) par une pose, sans les Recettes.
+  function gainOf(state, changes) {
+    let d = 0;
+    for (const ch of changes) {
+      const ex = state.board[ch.k];
+      if (ex && ex.die && ex.cell.k === 'tree') d -= ex.die.v;
+      if (ch.die && ch.cell.k === 'tree') d += ch.die.v;
+    }
+    return d;
+  }
+
+  const DIE_EVENTS = ['new', 'up', 'basket', 'barrow'];
 
   function play(state, id, rot, x, y, opts) {
     if (state.over) return { ok: false, reason: 'La partie est terminée.' };
     if (!state.hand.includes(id)) return { ok: false, reason: 'Cette carte n’est pas dans votre main.' };
     const ev = evaluate(state, id, rot, x, y, opts);
     if (!ev.ok) return ev;
+    const firstTurn = state.placed.length === 1;
     for (const ch of ev.changes) {
       state.board[ch.k] = { cell: ch.cell, card: id, die: ch.die, squirrel: ch.squirrel };
+    }
+    if (firstTurn) {
+      state.firstTurnDice = ev.changes.filter((c) => c.die && DIE_EVENTS.includes(c.event)).map((c) => c.die.t);
     }
     state.reserve = ev.reserve;
     state.barrowFree = ev.barrowFree;
@@ -287,7 +379,6 @@
     state.placed.push({ id, rot: rot & 3, x, y });
     state.hand = state.hand.filter((h) => h !== id);
     if (state.deck.length) state.hand.push(state.deck.shift());
-    state.log.push('Carte n°' + id + ' posée.' + (ev.usesSquirrel ? ' (Écureuil)' : ''));
     if (state.placed.length >= GAME_CARDS || state.hand.length === 0) {
       state.over = true;
       state.endReason = 'complete';
@@ -307,7 +398,7 @@
         for (let x = b.minX - fp.w + 1; x <= b.maxX; x++) {
           const ev = evaluate(state, id, rot, x, y, { allowSquirrel: true });
           if (ev.ok) {
-            out.push({ id, rot, x, y, usesSquirrel: ev.usesSquirrel });
+            out.push({ id, rot, x, y, usesSquirrel: ev.usesSquirrel, gain: ev.gain });
             if (limit && out.length >= limit) return out;
           }
         }
@@ -320,6 +411,23 @@
     return state.hand.some((id) => legalMoves(state, id, 1).length > 0);
   }
 
+  // Meilleur coup immédiat (aide de jeu) : maximise les fruits, garde l'Écureuil.
+  function bestMove(state, ids, rotFilter) {
+    const b = bounds(state);
+    const cx = (b.minX + b.maxX + 1) / 2, cy = (b.minY + b.maxY + 1) / 2;
+    let best = null;
+    for (const id of ids) {
+      for (const m of legalMoves(state, id)) {
+        if (rotFilter != null && m.rot !== rotFilter) continue;
+        const fp = footprint(cardById(id), m.rot);
+        const dist = Math.hypot(m.x + fp.w / 2 - cx, m.y + fp.h / 2 - cy);
+        const val = m.gain - (m.usesSquirrel ? 6 : 0) - dist * 0.01;
+        if (!best || val > best.val) best = Object.assign({ val }, m);
+      }
+    }
+    return best;
+  }
+
   function score(state) {
     const byType = { orange: 0, citron: 0, vert: 0 };
     let barrow = 0;
@@ -327,34 +435,54 @@
     for (const e of Object.values(state.board)) {
       if (!e.die) continue;
       if (e.cell.k === 'clear') { lost += e.die.v; continue; }
+      byType[e.die.t] += e.die.v;
       if (e.die.barrow) barrow += e.die.v;
-      else byType[e.die.t] += e.die.v;
     }
-    const base = byType.orange + byType.citron + byType.vert + barrow;
+    const base = byType.orange + byType.citron + byType.vert;
+    const mult = { orange: 1, citron: 1, vert: 1 };
+    const recipes = [];
     let bonus = 0;
     let target = null;
-    const recipes = [];
     if (state.recipes) {
       target = 0;
       for (const rid of state.recipes) {
-        const r = RECIPES[rid - 1];
-        const done = !!r.check(state);
+        const r = RECIPE_BY_ID[rid];
         target += r.target;
-        if (done) bonus += r.bonus;
-        recipes.push({ id: r.id, name: r.name, text: r.text, target: r.target, bonus: r.bonus, done });
+        const done = recipeDone(state, r);
+        let effect = 0;
+        let detail = '';
+        if (r.kind === 'double') {
+          mult[r.t] *= 2;
+          detail = FRUIT_LABEL[r.t] + ' × 2';
+        } else if (r.kind === 'punch') {
+          const low = TYPES.slice().sort((a, b) => byType[a] - byType[b])[0];
+          mult[low] *= 2;
+          detail = FRUIT_LABEL[low] + ' × 2';
+        } else if (done) {
+          bonus += r.pts;
+          effect = r.pts;
+        }
+        recipes.push(Object.assign({}, r, { done, effect, detail }));
       }
     }
-    const total = base + bonus;
-    return { byType, barrow, lost, base, bonus, total, target, recipes, won: target === null ? null : total >= target };
+    const scored = {};
+    let multiplied = 0;
+    for (const t of TYPES) { scored[t] = byType[t] * mult[t]; multiplied += scored[t]; }
+    const total = multiplied + bonus;
+    return {
+      byType, scored, mult, barrow, lost, base, bonus, total, target, recipes,
+      won: target === null ? null : total >= target,
+      dice: diceInPlay(state).length,
+    };
   }
 
   const RANKS = [
     { min: 0, title: 'Jeune pousse' },
-    { min: 25, title: 'Jardinier du dimanche' },
-    { min: 35, title: 'Arboriculteur' },
-    { min: 45, title: 'Maître agrumiculteur' },
-    { min: 55, title: 'Gardien d’Hortis' },
-    { min: 65, title: 'Légende du verger' },
+    { min: 20, title: 'Jardinier du dimanche' },
+    { min: 30, title: 'Arboriculteur' },
+    { min: 40, title: 'Maître agrumiculteur' },
+    { min: 50, title: 'Gardien d’Ortie' },
+    { min: 60, title: 'Légende du verger' },
   ];
   function rank(total) {
     let r = RANKS[0];
@@ -363,9 +491,9 @@
   }
 
   return {
-    TYPES, TYPE_LABEL, FRUIT_LABEL, DICE_PER_TYPE, BASKET, BARROW, CARD_W, CARD_H, GAME_CARDS,
-    CARDS, RECIPES, RANKS,
-    cardById, footprint, key, bounds, newGame, evaluate, play, legalMoves, hasAnyMove, score, rank,
-    randomSeed, diceOf, lostDice,
+    TYPES, TYPE_LABEL, FRUIT_LABEL, DIE_LABEL, DICE_PER_TYPE, BASKET, BARROW, CARD_W, CARD_H, GAME_CARDS,
+    CARDS, RECIPES, RECIPE_BY_ID, RANKS,
+    cardById, footprint, key, bounds, newGame, evaluate, play, legalMoves, hasAnyMove, bestMove, score, rank,
+    randomSeed, diceInPlay, recipeDone, gainOf,
   };
 });
