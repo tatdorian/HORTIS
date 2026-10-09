@@ -31,7 +31,7 @@
 
   let state = null;
   let history = [];
-  const ui = { sel: null, rot: 0, pos: null, drag: null, handDrag: null, dragEndAt: -1e9, fresh: null, popKeys: [], view: null, endShown: false };
+  const ui = { sel: null, rot: 0, pos: null, anchor: null, spin: null, lastTap: null, lastHandTap: null, drag: null, handDrag: null, dragEndAt: -1e9, fresh: null, popKeys: [], view: null, endShown: false };
 
   // ------------------------------------------------------------- Graphismes
   // Buisson en rosette de feuilles, comme sur les cartes.
@@ -251,7 +251,8 @@
     const ev = currentEval();
     const fp = H.footprint(H.cardById(ui.sel), ui.rot);
     const status = !ev.ok ? 'bad' : ev.usesSquirrel ? 'warn' : 'ok';
-    let g = `<g class="ghost-card ${status}">${placedCardSvg(ui.sel, ui.rot, ui.pos.x, ui.pos.y)}</g>`;
+    let g = `<g class="ghost-card ${status} ${ui.spin || ''}">${placedCardSvg(ui.sel, ui.rot, ui.pos.x, ui.pos.y)}</g>`;
+    ui.spin = null;
     g += `<rect class="ghost-frame ${status}" x="${ui.pos.x * S}" y="${ui.pos.y * S}" width="${fp.w * S}" height="${fp.h * S}" rx="16"/>`;
     for (const ch of ev.changes) {
       if (!ch.covered) continue;
@@ -294,7 +295,7 @@
     } else { msg = ev.reason; cls = 'bad'; }
     els.hint.textContent = msg;
     els.hint.className = 'hint ' + cls;
-    els.boardHelp.textContent = sel ? (touchMode() ? 'Glissez la carte du doigt · ⟲ ⟳ pour tourner' : 'Survolez pour déplacer · molette pour tourner · clic pour poser') : '';
+    els.boardHelp.textContent = sel ? (touchMode() ? 'Glissez la carte du doigt · touchez 2 fois pour tourner' : 'Survolez pour déplacer · molette pour tourner · clic pour poser') : '';
     els.boardHelp.classList.toggle('show', sel);
   }
 
@@ -314,8 +315,26 @@
       b.setAttribute('aria-pressed', selected ? 'true' : 'false');
       b.setAttribute('aria-label', 'Carte n°' + id);
       b.innerHTML = cardSvgStandalone(id, selected ? ui.rot : 0) + `<span class="key">${i + 1}</span>`;
-      b.addEventListener('click', () => {
+      b.addEventListener('click', (e) => {
         if (performance.now() - ui.dragEndAt < 80) return; // clic émis à la fin d'un glisser
+        if (touchMode()) {
+          const prev = ui.lastHandTap;
+          const now = performance.now();
+          if (prev && prev.id === id && now - prev.t < DOUBLE_TAP_MS) {
+            // double toucher : on annule l'effet du 1er toucher, puis on tourne
+            ui.lastHandTap = null;
+            ui.sel = id; ui.rot = prev.rot; ui.pos = prev.pos; ui.anchor = prev.anchor;
+            tapRotate();
+            return;
+          }
+          ui.lastHandTap = { id, t: now, rot: ui.sel === id ? ui.rot : null, pos: ui.sel === id ? ui.pos : null, anchor: ui.anchor };
+          if (ui.lastHandTap.rot == null) {
+            // la carte n'était pas encore choisie : le 1er toucher la choisit
+            selectCard(id);
+            ui.lastHandTap.rot = ui.rot; ui.lastHandTap.pos = ui.pos; ui.lastHandTap.anchor = null;
+            return;
+          }
+        }
         selectCard(id);
       });
       b.addEventListener('pointerdown', (e) => startHandDrag(e, id));
@@ -468,12 +487,39 @@
     const oldFp = H.footprint(H.cardById(ui.sel), ui.rot);
     ui.rot = (ui.rot + d + 4) & 3;
     if (ui.pos) {
+      // Le centre exact de la carte est conservé d'une rotation à l'autre :
+      // tourner plusieurs fois ne fait pas « glisser » la carte.
+      let a = ui.anchor;
+      if (!a || Math.round(a.x - oldFp.w / 2) !== ui.pos.x || Math.round(a.y - oldFp.h / 2) !== ui.pos.y) {
+        a = { x: ui.pos.x + oldFp.w / 2, y: ui.pos.y + oldFp.h / 2 };
+      }
+      ui.anchor = a;
       const nf = H.footprint(H.cardById(ui.sel), ui.rot);
-      const cx = ui.pos.x + oldFp.w / 2, cy = ui.pos.y + oldFp.h / 2;
-      ui.pos = { x: Math.round(cx - nf.w / 2), y: Math.round(cy - nf.h / 2) };
+      ui.pos = { x: Math.round(a.x - nf.w / 2), y: Math.round(a.y - nf.h / 2) };
     }
+    ui.spin = d > 0 ? 'spin-r' : 'spin-l';
     renderHand();
     renderGhost();
+  }
+
+  // Double toucher (doigt) : la carte tourne d'un quart de tour.
+  const DOUBLE_TAP_MS = 320;
+  function isDoubleTap(e, where) {
+    const now = performance.now();
+    const t = ui.lastTap;
+    const dbl = !!t && t.where === where && now - t.t < DOUBLE_TAP_MS && Math.hypot(e.clientX - t.x, e.clientY - t.y) < 45;
+    ui.lastTap = dbl ? null : { t: now, x: e.clientX, y: e.clientY, where };
+    return dbl;
+  }
+  function tapRotate() {
+    rotate(1);
+    try { if (navigator.vibrate) navigator.vibrate(12); } catch (err) { /* ignore */ }
+  }
+
+  function insideGhost(p) {
+    if (!ui.pos || ui.sel == null) return false;
+    const fp = H.footprint(H.cardById(ui.sel), ui.rot);
+    return p.x >= ui.pos.x && p.x < ui.pos.x + fp.w && p.y >= ui.pos.y && p.y < ui.pos.y + fp.h;
   }
 
   function boardPoint(evt) {
@@ -671,7 +717,11 @@
     }
     const d = ui.drag;
     ui.drag = null;
-    if (d && !d.moved) { const p = boardPoint(e); if (p) setPos(centerAt(p)); }
+    if (d && d.moved) { ui.lastTap = null; }
+    else if (d) {
+      if (isDoubleTap(e, 'board')) tapRotate();
+      else { const p = boardPoint(e); if (p && !insideGhost(p)) setPos(centerAt(p)); }
+    }
     updateControls(currentEval());
   });
   els.board.addEventListener('pointercancel', () => { ui.drag = null; });

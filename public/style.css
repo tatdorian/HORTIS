@@ -132,7 +132,11 @@ button { font: inherit; color: inherit; }
 .board .gain-pill rect { fill: rgba(34, 48, 31, .9); stroke: #fff; stroke-width: 2.5; }
 .board .gain-pill.pos rect { fill: #2e8b48; }
 .board .gain-pill text { fill: #fff; font: 800 24px 'Nunito', sans-serif; }
-.board .fresh, .board .pop { transform-box: fill-box; transform-origin: center; }
+.board .fresh, .board .pop, .board .ghost-card { transform-box: fill-box; transform-origin: center; }
+.board .ghost-card.spin-r { animation: spin-r .22s ease-out; }
+.board .ghost-card.spin-l { animation: spin-l .22s ease-out; }
+@keyframes spin-r { from { transform: rotate(-90deg) scale(.92); } to { transform: none; } }
+@keyframes spin-l { from { transform: rotate(90deg) scale(.92); } to { transform: none; } }
 .board .fresh { animation: drop .4s cubic-bezier(.2, .9, .3, 1.2); }
 .board .pop { animation: pop .5s cubic-bezier(.2, .9, .3, 1.4); }
 @keyframes drop { from { opacity: 0; transform: scale(1.1) translateY(-14px); } to { opacity: 1; transform: none; } }
