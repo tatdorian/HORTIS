@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
   <title>Ortie — le verger solo</title>
   <meta name="description" content="Ortie : le casse-tête solo du verger en 9 cartes. Superposez les arbres de même essence pour récolter un maximum de fruits.">
   <meta name="theme-color" content="#2f6b3a">
@@ -27,7 +27,9 @@
     </div>
     <div class="chips" aria-label="Avancement">
       <span class="chip"><b id="turn-label">1</b>/9 cartes</span>
-      <span class="chip score-chip"><b id="score-mini">0</b> fruits</span>
+      <button type="button" id="btn-details" class="chip details-chip" aria-expanded="false" aria-controls="side" title="Score, réserve et recettes">
+        <b id="score-mini">0</b> fruits<span id="obj-mini" class="obj-mini"></span><span id="res-mini" class="res-mini"></span><span class="caret">▾</span>
+      </button>
       <span class="chip seed-chip" title="Même numéro = mêmes cartes (mode compétitif)">Partie n° <b id="seed-label">—</b></span>
     </div>
     <nav class="top-actions">
@@ -45,7 +47,13 @@
       <div class="board-help" id="board-help"></div>
     </section>
 
-    <aside class="side">
+    <div id="side-backdrop" class="side-backdrop"></div>
+    <aside class="side" id="side">
+      <div class="sheet-head">
+        <span class="grip" aria-hidden="true"></span>
+        <h2>Détails de la partie</h2>
+        <button type="button" id="btn-side-close" class="btn icon" aria-label="Fermer">✕</button>
+      </div>
       <section class="panel score-panel">
         <div class="score-head">
           <div class="score-big"><span id="score-total">0</span><small>fruits</small></div>

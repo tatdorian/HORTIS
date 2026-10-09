@@ -17,7 +17,8 @@
   const els = {
     board: $('board'), boardHelp: $('board-help'), hand: $('hand'), deck: $('deck'),
     reserve: $('reserve'), barrow: $('tok-barrow'), squirrel: $('tok-squirrel'),
-    scoreTotal: $('score-total'), scoreMini: $('score-mini'), scoreRank: $('score-rank'), scoreRows: $('score-rows'), objective: $('objective'),
+    scoreTotal: $('score-total'), scoreMini: $('score-mini'), objMini: $('obj-mini'), resMini: $('res-mini'),
+    btnDetails: $('btn-details'), btnSideClose: $('btn-side-close'), sideBackdrop: $('side-backdrop'), boardWrap: document.querySelector('.board-wrap'), scoreRank: $('score-rank'), scoreRows: $('score-rows'), objective: $('objective'),
     recipes: $('recipes'), recipeList: $('recipe-list'), seed: $('seed-label'), turn: $('turn-label'),
     hint: $('hint'), toast: $('toast'),
     btnUndo: $('btn-undo'), btnNew: $('btn-new'), btnRules: $('btn-rules'), btnPlace: $('btn-place'),
@@ -30,7 +31,7 @@
 
   let state = null;
   let history = [];
-  const ui = { sel: null, rot: 0, pos: null, drag: null, fresh: null, popKeys: [], view: null, endShown: false };
+  const ui = { sel: null, rot: 0, pos: null, drag: null, handDrag: null, dragEndAt: -1e9, fresh: null, popKeys: [], view: null, endShown: false };
 
   // ------------------------------------------------------------- Graphismes
   // Buisson en rosette de feuilles, comme sur les cartes.
@@ -293,7 +294,7 @@
     } else { msg = ev.reason; cls = 'bad'; }
     els.hint.textContent = msg;
     els.hint.className = 'hint ' + cls;
-    els.boardHelp.textContent = sel ? (touchMode() ? 'Glissez pour déplacer · ⟲ ⟳ pour tourner' : 'Survolez pour déplacer · molette pour tourner · clic pour poser') : '';
+    els.boardHelp.textContent = sel ? (touchMode() ? 'Glissez la carte du doigt · ⟲ ⟳ pour tourner' : 'Survolez pour déplacer · molette pour tourner · clic pour poser') : '';
     els.boardHelp.classList.toggle('show', sel);
   }
 
@@ -313,7 +314,11 @@
       b.setAttribute('aria-pressed', selected ? 'true' : 'false');
       b.setAttribute('aria-label', 'Carte n°' + id);
       b.innerHTML = cardSvgStandalone(id, selected ? ui.rot : 0) + `<span class="key">${i + 1}</span>`;
-      b.addEventListener('click', () => selectCard(id));
+      b.addEventListener('click', () => {
+        if (performance.now() - ui.dragEndAt < 80) return; // clic émis à la fin d'un glisser
+        selectCard(id);
+      });
+      b.addEventListener('pointerdown', (e) => startHandDrag(e, id));
       els.hand.appendChild(b);
     });
   }
@@ -335,6 +340,8 @@
     const sc = H.score(state);
     els.scoreTotal.textContent = sc.total;
     els.scoreMini.textContent = sc.total;
+    els.objMini.textContent = sc.target != null ? ' / ' + sc.target : '';
+    els.resMini.innerHTML = H.TYPES.map((t) => `<i style="--c:${DIE_FILL[t]}" title="${H.FRUIT_LABEL[t]} en réserve">${state.reserve[t]}</i>`).join('');
     els.scoreRank.textContent = H.rank(sc.total);
     els.seed.textContent = state.seed;
     els.turn.textContent = Math.min(state.placed.length + (state.over ? 0 : 1), H.GAME_CARDS);
@@ -395,6 +402,56 @@
     renderHand();
     renderGhost();
   }
+
+  // Glisser une carte de la main directement sur le plateau (doigt ou souris).
+  function startHandDrag(e, id) {
+    if (state.over || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    lastPointerType = e.pointerType;
+    ui.handDrag = { id, pointerId: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+  }
+
+  function overBoard(e) {
+    const r = els.board.getBoundingClientRect();
+    return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+  }
+
+  document.addEventListener('pointermove', (e) => {
+    const d = ui.handDrag;
+    if (!d || d.pointerId !== e.pointerId) return;
+    if (!d.moved) {
+      if (Math.hypot(e.clientX - d.x, e.clientY - d.y) < 10) return;
+      d.moved = true;
+      document.body.classList.add('dragging');
+      if (ui.sel !== d.id) {
+        ui.sel = d.id;
+        const m = H.bestMove(state, [d.id]);
+        ui.rot = m ? m.rot : 0;
+        ui.pos = null;
+      }
+      for (const btn of els.hand.querySelectorAll('.hand-card')) btn.classList.toggle('selected', btn.getAttribute('aria-label') === 'Carte n°' + d.id);
+    }
+    if (e.cancelable) e.preventDefault();
+    if (!overBoard(e)) return;
+    const p = boardPoint(e);
+    if (!p) return;
+    // au doigt, la carte apparaît un peu au-dessus pour rester visible
+    if (e.pointerType !== 'mouse') p.y -= 0.9;
+    setPos(centerAt(p));
+  }, { passive: false });
+
+  function endHandDrag(e) {
+    const d = ui.handDrag;
+    if (!d || d.pointerId !== e.pointerId) return;
+    ui.handDrag = null;
+    document.body.classList.remove('dragging');
+    if (!d.moved) return; // simple toucher : géré par « click »
+    ui.dragEndAt = performance.now();
+    renderHand();
+    renderGhost();
+  }
+  document.addEventListener('pointerup', endHandDrag);
+  document.addEventListener('pointercancel', endHandDrag);
 
   function suggest() {
     if (state.over) return;
@@ -625,6 +682,22 @@
     rotate(e.deltaY > 0 ? 1 : -1);
   }, { passive: false });
 
+  // Le plateau ne doit jamais faire défiler ni zoomer la page : on capte les gestes tactiles.
+  const stopScroll = (e) => { if (e.cancelable) e.preventDefault(); };
+  els.boardWrap.addEventListener('touchstart', stopScroll, { passive: false });
+  els.boardWrap.addEventListener('touchmove', stopScroll, { passive: false });
+  els.boardWrap.addEventListener('gesturestart', stopScroll, { passive: false });
+  document.addEventListener('dblclick', (e) => { if (els.boardWrap.contains(e.target)) e.preventDefault(); }, { passive: false });
+
+  // Panneau « Détails » (mobile)
+  function setSide(open) {
+    document.body.classList.toggle('side-open', open);
+    els.btnDetails.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  els.btnDetails.addEventListener('click', () => setSide(!document.body.classList.contains('side-open')));
+  els.btnSideClose.addEventListener('click', () => setSide(false));
+  els.sideBackdrop.addEventListener('click', () => setSide(false));
+
   els.btnRotL.addEventListener('click', () => rotate(-1));
   els.btnRotR.addEventListener('click', () => rotate(1));
   els.btnPlace.addEventListener('click', tryPlace);
@@ -668,7 +741,10 @@
     else if (k === 'q') rotate(-1);
     else if (k === 'h') suggest();
     else if (k === 'enter') { if (ui.sel != null) { e.preventDefault(); tryPlace(); } }
-    else if (k === 'escape') { ui.sel = null; ui.pos = null; renderHand(); renderGhost(); }
+    else if (k === 'escape') {
+      if (document.body.classList.contains('side-open')) { setSide(false); return; }
+      ui.sel = null; ui.pos = null; renderHand(); renderGhost();
+    }
     else if (k.startsWith('arrow')) {
       if (ui.sel == null) return;
       e.preventDefault();

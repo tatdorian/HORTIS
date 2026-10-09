@@ -47,6 +47,8 @@ docker run -p 3000:3000 -e PORT=3000 ortie
 ## Aides de jeu
 
 - La carte choisie apparaît directement à la meilleure position. Il suffit de la déplacer (souris ou doigt), de la tourner, puis de la poser.
+- On peut aussi faire glisser une carte de la main directement sur le plateau.
+- Sur téléphone, l'écran est fixe comme une application : le plateau ne bouge jamais pendant qu'on déplace une carte. Le score et la réserve s'affichent en haut ; un toucher ouvre le panneau « Détails » (score, réserve, recettes).
 - Chaque case recouverte affiche le dé obtenu, ou une croix rouge si la pose est interdite. Le nombre de fruits gagnés s'affiche sur la carte et sur le bouton **Poser**.
 - **Conseil** (💡) propose le coup qui rapporte le plus de fruits ce tour-ci.
 - **Annuler** revient sur le dernier coup. La partie est sauvegardée automatiquement.
