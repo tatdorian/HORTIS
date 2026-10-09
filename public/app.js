@@ -4,6 +4,7 @@
   const H = window.OrtieCore;
   const S = 100; // taille d'une case en unités SVG
   const CW = H.CARD_W * S, CH = H.CARD_H * S;
+  const APP_VERSION = '1.6';
   const STORE_KEY = 'ortie.save.v2';
   const SEEN_KEY = 'ortie.seenRules';
 
@@ -201,18 +202,47 @@
   }
 
   // ----------------------------------------------------------------- Rendu
-  function computeView() {
+  // Cadrage du plateau. En cours de partie, il ne fait que s'agrandir quand la
+  // place manque (les cartes déjà posées ne sautent pas d'un tour à l'autre).
+  function computeView(keep) {
     const b = H.bounds(state);
     let minX = b.minX - 2, minY = b.minY - 2, maxX = b.maxX + 3, maxY = b.maxY + 3;
     const minW = 7, minH = 7;
     if (maxX - minX < minW) { const d = minW - (maxX - minX); minX -= Math.floor(d / 2); maxX += Math.ceil(d / 2); }
     if (maxY - minY < minH) { const d = minH - (maxY - minY); minY -= Math.floor(d / 2); maxY += Math.ceil(d / 2); }
+    const old = ui.view;
+    if (keep && old) {
+      minX = Math.min(minX, old.minX); minY = Math.min(minY, old.minY);
+      maxX = Math.max(maxX, old.maxX); maxY = Math.max(maxY, old.maxY);
+    }
     ui.view = { minX, minY, maxX, maxY };
+    ui.animateView = !!keep;
+  }
+
+  let viewAnim = 0;
+  function setViewBox(target) {
+    cancelAnimationFrame(viewAnim);
+    const cur = (els.board.getAttribute('viewBox') || '').split(/\s+/).map(Number);
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!ui.animateView || reduce || cur.length !== 4 || cur.some(isNaN) || cur.every((v, i) => v === target[i])) {
+      els.board.setAttribute('viewBox', target.join(' '));
+      return;
+    }
+    // Transition douce au lieu d'un saut quand le plateau s'agrandit.
+    const t0 = performance.now(), dur = 420;
+    const step = (now) => {
+      const t = Math.min(1, (now - t0) / dur);
+      const k = 1 - Math.pow(1 - t, 3);
+      els.board.setAttribute('viewBox', cur.map((v, i) => (v + (target[i] - v) * k).toFixed(2)).join(' '));
+      if (t < 1) viewAnim = requestAnimationFrame(step);
+    };
+    viewAnim = requestAnimationFrame(step);
   }
 
   function renderBoard() {
     const v = ui.view;
-    els.board.setAttribute('viewBox', [v.minX * S, v.minY * S, (v.maxX - v.minX) * S, (v.maxY - v.minY) * S].join(' '));
+    setViewBox([v.minX * S, v.minY * S, (v.maxX - v.minX) * S, (v.maxY - v.minY) * S]);
+    ui.animateView = false;
     let g = '<g class="grid">';
     for (let y = v.minY; y <= v.maxY; y++) for (let x = v.minX; x <= v.maxX; x++) g += `<circle cx="${x * S}" cy="${y * S}" r="3.5"/>`;
     g += '</g>';
@@ -281,7 +311,7 @@
     els.btnHint.disabled = state.over;
     els.btnPlace.disabled = !(ev && ev.ok);
     els.btnPlace.classList.toggle('warn', !!(ev && ev.ok && ev.usesSquirrel));
-    els.placeLabel.textContent = ev && ev.ok && ev.usesSquirrel ? 'Poser avec l’Écureuil' : 'Poser';
+    els.placeLabel.textContent = ev && ev.ok && ev.usesSquirrel ? 'Poser (Écureuil)' : 'Poser';
     els.placeGain.textContent = ev && ev.ok ? (ev.gain > 0 ? '+' : '') + ev.gain : '';
     let msg, cls = '';
     if (state.over) msg = 'Partie terminée. Lancez une nouvelle partie quand vous voulez.';
@@ -301,6 +331,14 @@
 
   let lastPointerType = 'mouse';
   const touchMode = () => lastPointerType !== 'mouse' || window.matchMedia('(hover: none)').matches;
+  let lastTouchAt = -1e9;
+  let lastTouchEnd = -1e9;
+  function noteTouch() { lastTouchAt = performance.now(); lastPointerType = 'touch'; }
+  const recentTouch = () => performance.now() - lastTouchAt < 900;
+  function findTouch(list, id) {
+    for (let i = 0; i < list.length; i++) if (list[i].identifier === id) return list[i];
+    return null;
+  }
 
   function renderHand() {
     els.hand.innerHTML = '';
@@ -315,29 +353,20 @@
       b.setAttribute('aria-pressed', selected ? 'true' : 'false');
       b.setAttribute('aria-label', 'Carte n°' + id);
       b.innerHTML = cardSvgStandalone(id, selected ? ui.rot : 0) + `<span class="key">${i + 1}</span>`;
-      b.addEventListener('click', (e) => {
-        if (performance.now() - ui.dragEndAt < 80) return; // clic émis à la fin d'un glisser
-        if (touchMode()) {
-          const prev = ui.lastHandTap;
-          const now = performance.now();
-          if (prev && prev.id === id && now - prev.t < DOUBLE_TAP_MS) {
-            // double toucher : on annule l'effet du 1er toucher, puis on tourne
-            ui.lastHandTap = null;
-            ui.sel = id; ui.rot = prev.rot; ui.pos = prev.pos; ui.anchor = prev.anchor;
-            tapRotate();
-            return;
-          }
-          ui.lastHandTap = { id, t: now, rot: ui.sel === id ? ui.rot : null, pos: ui.sel === id ? ui.pos : null, anchor: ui.anchor };
-          if (ui.lastHandTap.rot == null) {
-            // la carte n'était pas encore choisie : le 1er toucher la choisit
-            selectCard(id);
-            ui.lastHandTap.rot = ui.rot; ui.lastHandTap.pos = ui.pos; ui.lastHandTap.anchor = null;
-            return;
-          }
-        }
+      // Souris / clavier
+      b.addEventListener('click', () => {
+        if (recentTouch() || performance.now() - ui.dragEndAt < 80) return;
         selectCard(id);
       });
-      b.addEventListener('pointerdown', (e) => startHandDrag(e, id));
+      b.addEventListener('pointerdown', (e) => { if (e.pointerType !== 'touch' && !recentTouch()) startHandDrag(e, id); });
+      // Doigt (iPhone / Android) : évènements tactiles natifs
+      b.addEventListener('touchstart', (e) => {
+        noteTouch();
+        if (e.cancelable) e.preventDefault(); // pas de zoom, de défilement ni de menu
+        if (state.over || e.touches.length > 1) return;
+        const t = e.changedTouches[0];
+        ui.handDrag = { id, touchId: t.identifier, x: t.clientX, y: t.clientY, moved: false };
+      }, { passive: false });
       els.hand.appendChild(b);
     });
   }
@@ -435,11 +464,9 @@
     return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
   }
 
-  document.addEventListener('pointermove', (e) => {
-    const d = ui.handDrag;
-    if (!d || d.pointerId !== e.pointerId) return;
+  function handDragMove(d, pt, finger) {
     if (!d.moved) {
-      if (Math.hypot(e.clientX - d.x, e.clientY - d.y) < 10) return;
+      if (Math.hypot(pt.clientX - d.x, pt.clientY - d.y) < 10) return;
       d.moved = true;
       document.body.classList.add('dragging');
       if (ui.sel !== d.id) {
@@ -448,29 +475,59 @@
         ui.rot = m ? m.rot : 0;
         ui.pos = null;
       }
+      // pas de re-rendu de la main pendant le geste (l'élément touché doit rester en place)
       for (const btn of els.hand.querySelectorAll('.hand-card')) btn.classList.toggle('selected', btn.getAttribute('aria-label') === 'Carte n°' + d.id);
     }
-    if (e.cancelable) e.preventDefault();
-    if (!overBoard(e)) return;
-    const p = boardPoint(e);
+    if (!overBoard(pt)) return;
+    const p = boardPoint(pt);
     if (!p) return;
     // au doigt, la carte apparaît un peu au-dessus pour rester visible
-    if (e.pointerType !== 'mouse') p.y -= 0.9;
+    if (finger) p.y -= 0.9;
     setPos(centerAt(p));
-  }, { passive: false });
+  }
 
-  function endHandDrag(e) {
-    const d = ui.handDrag;
-    if (!d || d.pointerId !== e.pointerId) return;
+  function finishHandDrag(d) {
     ui.handDrag = null;
     document.body.classList.remove('dragging');
-    if (!d.moved) return; // simple toucher : géré par « click »
+    if (!d.moved) return false;
     ui.dragEndAt = performance.now();
     renderHand();
     renderGhost();
+    return true;
   }
-  document.addEventListener('pointerup', endHandDrag);
-  document.addEventListener('pointercancel', endHandDrag);
+
+  // Souris
+  document.addEventListener('pointermove', (e) => {
+    const d = ui.handDrag;
+    if (!d || d.pointerId == null || d.pointerId !== e.pointerId) return;
+    handDragMove(d, e, false);
+  });
+  const endMouseHandDrag = (e) => {
+    const d = ui.handDrag;
+    if (d && d.pointerId != null && d.pointerId === e.pointerId) finishHandDrag(d);
+  };
+  document.addEventListener('pointerup', endMouseHandDrag);
+  document.addEventListener('pointercancel', endMouseHandDrag);
+
+  // Toucher simple / double sur une carte de la main
+  function handTap(id) {
+    const now = performance.now();
+    const prev = ui.lastHandTap;
+    if (prev && prev.id === id && now - prev.t < DOUBLE_TAP_MS) {
+      // double toucher : on annule l'effet du 1er toucher, puis on tourne
+      ui.lastHandTap = null;
+      ui.sel = id; ui.rot = prev.rot; ui.pos = prev.pos; ui.anchor = prev.anchor;
+      tapRotate();
+      return;
+    }
+    if (ui.sel === id) {
+      ui.lastHandTap = { id, t: now, rot: ui.rot, pos: ui.pos, anchor: ui.anchor };
+      selectCard(id); // toucher lent sur la carte choisie : désélection
+    } else {
+      selectCard(id);
+      ui.lastHandTap = { id, t: now, rot: ui.rot, pos: ui.pos, anchor: null };
+    }
+  }
 
   function suggest() {
     if (state.over) return;
@@ -503,7 +560,7 @@
   }
 
   // Double toucher (doigt) : la carte tourne d'un quart de tour.
-  const DOUBLE_TAP_MS = 320;
+  const DOUBLE_TAP_MS = 420;
   function isDoubleTap(e, where) {
     const now = performance.now();
     const t = ui.lastTap;
@@ -567,7 +624,7 @@
     else if (res.gain > 0) toast(`+${res.gain} fruits`, 'ok');
     ui.fresh = true;
     ui.sel = null; ui.pos = null;
-    computeView();
+    computeView(true);
     save();
     renderAll();
     if (state.over) setTimeout(showEnd, 650);
@@ -681,50 +738,60 @@
   }
 
   // ------------------------------------------------------------- Évènements
-  els.board.addEventListener('pointerdown', (e) => {
-    lastPointerType = e.pointerType;
-    if (ui.sel == null || state.over) return;
-    if (e.pointerType === 'mouse') return;
-    e.preventDefault();
-    const p = boardPoint(e);
-    if (!p) return;
-    try { els.board.setPointerCapture(e.pointerId); } catch (err) { /* pointeur synthétique */ }
-    ui.drag = { id: e.pointerId, start: p, startPos: ui.pos ? Object.assign({}, ui.pos) : centerAt(p), moved: false };
-  });
+  // Souris / stylet : survoler pour déplacer, cliquer pour poser.
   els.board.addEventListener('pointermove', (e) => {
+    if (e.pointerType === 'touch' || recentTouch()) return;
+    lastPointerType = 'mouse';
     if (ui.sel == null || state.over) return;
     const p = boardPoint(e);
-    if (!p) return;
-    if (e.pointerType === 'mouse') {
-      lastPointerType = 'mouse';
-      setPos(centerAt(p));
-      return;
-    }
-    const d = ui.drag;
-    if (!d || d.id !== e.pointerId) return;
-    const dx = p.x - d.start.x, dy = p.y - d.start.y;
-    if (Math.abs(dx) > 0.25 || Math.abs(dy) > 0.25) d.moved = true;
-    if (d.moved) setPos({ x: d.startPos.x + Math.round(dx), y: d.startPos.y + Math.round(dy) });
+    if (p) setPos(centerAt(p));
   });
   els.board.addEventListener('pointerup', (e) => {
-    if (ui.sel == null || state.over) return;
-    if (e.pointerType === 'mouse') {
-      if (e.button !== 0) return;
-      const p = boardPoint(e);
-      if (p) setPos(centerAt(p));
-      tryPlace();
-      return;
-    }
-    const d = ui.drag;
-    ui.drag = null;
-    if (d && d.moved) { ui.lastTap = null; }
-    else if (d) {
-      if (isDoubleTap(e, 'board')) tapRotate();
-      else { const p = boardPoint(e); if (p && !insideGhost(p)) setPos(centerAt(p)); }
-    }
-    updateControls(currentEval());
+    if (e.pointerType === 'touch' || recentTouch()) return;
+    if (ui.sel == null || state.over || e.button !== 0) return;
+    const p = boardPoint(e);
+    if (p) setPos(centerAt(p));
+    tryPlace();
   });
-  els.board.addEventListener('pointercancel', () => { ui.drag = null; });
+
+  // Doigt : glisser = déplacer la carte, toucher = l'amener ici, double toucher = tourner.
+  els.boardWrap.addEventListener('touchstart', (e) => {
+    noteTouch();
+    if (e.cancelable) e.preventDefault();
+    if (e.touches.length > 1) { ui.drag = null; return; }
+    if (ui.sel == null || state.over) return;
+    const t = e.changedTouches[0];
+    const p = boardPoint(t);
+    if (!p) return;
+    ui.drag = { id: t.identifier, start: p, startPos: ui.pos ? Object.assign({}, ui.pos) : centerAt(p), moved: false, sx: t.clientX, sy: t.clientY };
+  }, { passive: false });
+  els.boardWrap.addEventListener('touchmove', (e) => {
+    if (e.cancelable) e.preventDefault();
+    const d = ui.drag;
+    if (!d) return;
+    const t = findTouch(e.changedTouches, d.id);
+    if (!t) return;
+    if (!d.moved && Math.hypot(t.clientX - d.sx, t.clientY - d.sy) > 8) d.moved = true;
+    if (!d.moved) return;
+    const p = boardPoint(t);
+    if (p) setPos({ x: d.startPos.x + Math.round(p.x - d.start.x), y: d.startPos.y + Math.round(p.y - d.start.y) });
+  }, { passive: false });
+  els.boardWrap.addEventListener('touchend', (e) => {
+    noteTouch();
+    if (e.cancelable) e.preventDefault();
+    const d = ui.drag;
+    if (!d) return;
+    const t = findTouch(e.changedTouches, d.id);
+    if (!t) return;
+    ui.drag = null;
+    if (ui.sel == null || state.over) return;
+    if (d.moved) ui.lastTap = null;
+    else if (isDoubleTap(t, 'board')) tapRotate();
+    else { const p = boardPoint(t); if (p && !insideGhost(p)) setPos(centerAt(p)); }
+    updateControls(currentEval());
+  }, { passive: false });
+  els.boardWrap.addEventListener('touchcancel', () => { ui.drag = null; });
+
   els.board.addEventListener('contextmenu', (e) => { if (ui.sel != null) { e.preventDefault(); rotate(1); } });
   els.board.addEventListener('wheel', (e) => {
     if (ui.sel == null) return;
@@ -732,12 +799,54 @@
     rotate(e.deltaY > 0 ? 1 : -1);
   }, { passive: false });
 
-  // Le plateau ne doit jamais faire défiler ni zoomer la page : on capte les gestes tactiles.
-  const stopScroll = (e) => { if (e.cancelable) e.preventDefault(); };
-  els.boardWrap.addEventListener('touchstart', stopScroll, { passive: false });
-  els.boardWrap.addEventListener('touchmove', stopScroll, { passive: false });
-  els.boardWrap.addEventListener('gesturestart', stopScroll, { passive: false });
-  document.addEventListener('dblclick', (e) => { if (els.boardWrap.contains(e.target)) e.preventDefault(); }, { passive: false });
+  // ---- Écran fixe sur téléphone : la page ne défile, ne rebondit et ne zoome jamais.
+  // (Safari iOS ignore souvent touch-action ; on bloque donc les gestes nous-mêmes.)
+  function canScroll(el) {
+    for (let n = el; n && n !== document.body && n.nodeType === 1; n = n.parentElement) {
+      if (n.matches('input, select, textarea')) return true;
+      if (n.matches('.rules-body, .side, dialog') && n.scrollHeight > n.clientHeight + 1) return true;
+    }
+    return false;
+  }
+  document.addEventListener('touchmove', (e) => {
+    const d = ui.handDrag;
+    if (d && d.touchId != null) {
+      if (e.cancelable) e.preventDefault();
+      const t = findTouch(e.changedTouches, d.touchId);
+      if (t) handDragMove(d, t, true);
+      return;
+    }
+    if (e.cancelable && (e.touches.length > 1 || !canScroll(e.target))) e.preventDefault();
+  }, { passive: false });
+  document.addEventListener('touchend', (e) => {
+    const d = ui.handDrag;
+    if (d && d.touchId != null) {
+      const t = findTouch(e.changedTouches, d.touchId);
+      if (t) {
+        noteTouch();
+        if (e.cancelable) e.preventDefault();
+        if (!finishHandDrag(d)) handTap(d.id);
+      }
+      return;
+    }
+    // Deux touchers rapides ailleurs (boutons…) : pas de zoom, mais le 2e toucher compte.
+    const now = performance.now();
+    const inGame = els.boardWrap.contains(e.target) || els.hand.contains(e.target);
+    if (!inGame && now - lastTouchEnd < 380 && e.cancelable && !e.target.closest('input, select, textarea')) {
+      e.preventDefault();
+      const btn = e.target.closest('button, label, summary');
+      if (btn && !btn.disabled) btn.click();
+    }
+    lastTouchEnd = now;
+  }, { passive: false });
+  document.addEventListener('touchcancel', () => {
+    if (ui.handDrag && ui.handDrag.touchId != null) finishHandDrag(ui.handDrag);
+    ui.drag = null;
+  });
+  const stopGesture = (e) => { if (e.cancelable) e.preventDefault(); };
+  document.addEventListener('gesturestart', stopGesture, { passive: false });
+  document.addEventListener('gesturechange', stopGesture, { passive: false });
+  document.addEventListener('dblclick', (e) => { if (e.cancelable) e.preventDefault(); }, { passive: false });
 
   // Panneau « Détails » (mobile)
   function setSide(open) {
@@ -807,6 +916,7 @@
 
   // ---------------------------------------------------------------- Démarrage
   buildDefs();
+  for (const el of document.querySelectorAll('.app-version')) el.textContent = APP_VERSION;
   renderLegend();
   fillRecipeSelects();
   const params = new URLSearchParams(location.search);

@@ -6,7 +6,20 @@
   const body = document.getElementById('install-body');
 
   if ('serviceWorker' in navigator && window.isSecureContext) {
-    window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
+    // Une nouvelle version déployée remplace l'ancienne tout de suite (rechargement unique).
+    const hadController = !!navigator.serviceWorker.controller;
+    let reloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!hadController || reloaded) return;
+      reloaded = true;
+      window.location.reload();
+    });
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').then((reg) => {
+        reg.update().catch(() => {});
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update().catch(() => {}); });
+      }).catch(() => {});
+    });
   }
 
   const standalone = window.matchMedia('(display-mode: standalone)').matches ||
