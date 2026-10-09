@@ -34,6 +34,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; } /* l'attribut hidden l'emporte toujours (ex. bouton Télécharger) */
 html, body { margin: 0; overscroll-behavior: none; }
 html { touch-action: manipulation; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 .version { margin-right: auto; align-self: center; font-size: 12px; color: var(--muted); }
@@ -96,7 +97,9 @@ button { font: inherit; color: inherit; }
 .btn.install { background: var(--brand-2); color: var(--on-brand); }
 .btn.icon { width: 44px; height: 44px; padding: 0; font-size: 22px; background: var(--surface); border-color: var(--line); color: var(--brand); }
 .btn.big { min-height: 52px; height: 52px; padding: 0 22px; font-size: 17px; white-space: nowrap; min-width: 0; }
-#place-label { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+#place-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 0 1 auto; }
+.btn.big .gain { flex: none; }
+.install-link { color: var(--brand); font-weight: 700; text-decoration: underline; }
 .btn .ico { font-size: 16px; line-height: 1; }
 .gain { background: rgba(255,255,255,.25); border-radius: 999px; padding: 1px 9px; font-size: 15px; }
 .gain:empty { display: none; }
@@ -171,6 +174,7 @@ svg .rnum { font: 700 21px 'Fraunces', serif; paint-order: stroke; stroke: rgba(
   padding: 6px 14px; border-radius: 999px; opacity: 0; transition: opacity .2s; pointer-events: none; white-space: nowrap;
 }
 .board-help.show { opacity: 1; }
+.board-help { max-width: calc(100% - 16px); overflow: hidden; text-overflow: ellipsis; }
 
 /* ------------------------------------------------------------ Panneau latéral */
 .side { display: flex; flex-direction: column; gap: 12px; min-width: 0; min-height: 0; overflow-y: auto; padding-bottom: 4px; }
@@ -398,10 +402,7 @@ kbd { background: var(--surface-2); border: 1px solid var(--line); border-bottom
   .actions .btn.big { flex: 1; min-height: 48px; height: 48px; font-size: 16px; padding: 0 14px; }
   .btn#btn-hint .lbl { display: none; }
   .btn#btn-hint { width: 44px; padding: 0; }
-  .hint {
-    font-size: 12.5px; line-height: 16px; height: 32px; white-space: normal;
-    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-  }
+  .hint { font-size: 13px; line-height: 18px; height: 18px; }
   .board-help { font-size: 12px; }
   .legend { grid-template-columns: repeat(4, 1fr); }
 }

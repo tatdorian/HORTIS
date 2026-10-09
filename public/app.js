@@ -4,7 +4,7 @@
   const H = window.OrtieCore;
   const S = 100; // taille d'une case en unités SVG
   const CW = H.CARD_W * S, CH = H.CARD_H * S;
-  const APP_VERSION = '1.6';
+  const APP_VERSION = '1.7';
   const STORE_KEY = 'ortie.save.v2';
   const SEEN_KEY = 'ortie.seenRules';
 
@@ -311,23 +311,57 @@
     els.btnHint.disabled = state.over;
     els.btnPlace.disabled = !(ev && ev.ok);
     els.btnPlace.classList.toggle('warn', !!(ev && ev.ok && ev.usesSquirrel));
-    els.placeLabel.textContent = ev && ev.ok && ev.usesSquirrel ? 'Poser (Écureuil)' : 'Poser';
+    els.placeLabel.textContent = ev && ev.ok && ev.usesSquirrel ? 'Poser avec l’Écureuil' : 'Poser';
     els.placeGain.textContent = ev && ev.ok ? (ev.gain > 0 ? '+' : '') + ev.gain : '';
     let msg, cls = '';
     if (state.over) msg = 'Partie terminée. Lancez une nouvelle partie quand vous voulez.';
     else if (!sel) msg = state.placed.length === 1 ? 'Choisissez une carte de votre main pour commencer.' : 'Choisissez votre prochaine carte.';
     else if (!ev) msg = 'Placez la carte sur le verger.';
     else if (ev.ok) {
-      msg = ev.usesSquirrel ? 'Pose possible avec l’Écureuil (une seule fois par partie).' : 'Pose valide.';
+      if (ev.usesSquirrel) msg = 'Possible avec l’Écureuil (une seule fois par partie).';
+      else msg = touchMode() ? 'Pose valide : touchez « Poser ».' : 'Pose valide : cliquez pour poser.';
       if (ev.notes.length) msg += ' ' + ev.notes.join(' ');
-      msg += touchMode() ? ' Touchez « Poser » pour valider.' : ' Cliquez pour poser.';
       cls = ev.usesSquirrel ? 'warn' : 'ok';
     } else { msg = ev.reason; cls = 'bad'; }
     els.hint.textContent = msg;
     els.hint.className = 'hint ' + cls;
     els.boardHelp.textContent = sel ? (touchMode() ? 'Glissez la carte du doigt · touchez 2 fois pour tourner' : 'Survolez pour déplacer · molette pour tourner · clic pour poser') : '';
     els.boardHelp.classList.toggle('show', sel);
+    fitTexts();
   }
+
+  // Les textes de la barre du bas tiennent toujours sur une ligne : si besoin,
+  // la police rétrécit (au lieu de passer à la ligne et de faire sauter l'écran).
+  function fitText(el, max, min) {
+    el.style.fontSize = max + 'px';
+    if (!el.clientWidth) return;
+    let size = max;
+    while (size > min && el.scrollWidth > el.clientWidth + 1) {
+      size = Math.max(min, size - 0.5);
+      el.style.fontSize = size + 'px';
+    }
+  }
+  function fitTexts() {
+    const narrow = window.matchMedia('(max-width: 820px)').matches;
+    fitText(els.hint, narrow ? 13 : 14, 9);
+    const L = els.placeLabel;
+    const clipped = () => L.scrollWidth > L.clientWidth + 1;
+    els.placeGain.style.display = '';
+    fitText(L, narrow ? 16 : 17, 11);
+    // Écran très étroit : libellé court, puis gain masqué (il reste affiché sur la carte),
+    // plutôt qu'un texte coupé ou un bouton qui change de taille.
+    if (clipped() && L.textContent === 'Poser avec l’Écureuil') {
+      L.textContent = 'Poser (Écureuil)';
+      fitText(L, narrow ? 16 : 17, 10);
+    }
+    if (clipped()) {
+      els.placeGain.style.display = 'none';
+      fitText(L, narrow ? 16 : 17, 10);
+    }
+    fitText(els.boardHelp, narrow ? 12 : 13, 9);
+  }
+  let fitTimer = 0;
+  window.addEventListener('resize', () => { clearTimeout(fitTimer); fitTimer = setTimeout(fitTexts, 80); });
 
   let lastPointerType = 'mouse';
   const touchMode = () => lastPointerType !== 'mouse' || window.matchMedia('(hover: none)').matches;

@@ -125,7 +125,10 @@
         </div>
       </div>
       <div id="install-body"></div>
-      <div class="dlg-actions"><button value="ok" class="btn primary">Compris</button></div>
+      <div class="dlg-actions">
+        <button type="button" id="btn-installed" class="btn ghost" title="Masquer le bouton Télécharger">Elle est déjà installée</button>
+        <button value="ok" class="btn primary">Compris</button>
+      </div>
     </form>
   </dialog>
 
@@ -181,7 +184,7 @@
         <p class="keys"><kbd>1</kbd> <kbd>2</kbd> choisir · <kbd>R</kbd> <kbd>Q</kbd> / molette / clic droit : pivoter · <kbd>←↑→↓</kbd> déplacer · <kbd>Entrée</kbd> poser · <kbd>H</kbd> conseil · <kbd>Ctrl</kbd>+<kbd>Z</kbd> annuler</p>
         <p class="keys">Sur téléphone : faites glisser la carte du bout du doigt (depuis la main ou sur le plateau), <b>touchez-la deux fois rapidement pour la tourner d’un quart de tour</b>, puis touchez « Poser ».</p>
       </div>
-      <div class="dlg-actions"><span class="version">Ortie · version <b class="app-version"></b></span><button class="btn primary" value="ok">À la cueillette !</button></div>
+      <div class="dlg-actions"><span class="version">Ortie · version <b class="app-version"></b> <a href="#" class="install-link" hidden>· installer l’appli</a></span><button class="btn primary" value="ok">À la cueillette !</button></div>
     </form>
   </dialog>
 

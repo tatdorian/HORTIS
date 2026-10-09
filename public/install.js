@@ -22,26 +22,45 @@
     });
   }
 
+  const INSTALLED_KEY = 'ortie.installed';
+  const markInstalled = () => { try { localStorage.setItem(INSTALLED_KEY, '1'); } catch (e) { /* ignore */ } };
+  const unmarkInstalled = () => { try { localStorage.removeItem(INSTALLED_KEY); } catch (e) { /* ignore */ } };
+  const knownInstalled = () => { try { return localStorage.getItem(INSTALLED_KEY) === '1'; } catch (e) { return false; } };
+
+  const extra = Array.from(document.querySelectorAll('.install-link'));
   const standalone = window.matchMedia('(display-mode: standalone)').matches ||
+    window.matchMedia('(display-mode: fullscreen)').matches ||
     window.matchMedia('(display-mode: window-controls-overlay)').matches || window.navigator.standalone === true;
-  if (standalone || !btn) return; // déjà installée : pas de bouton
+  if (standalone) { markInstalled(); return; } // on joue dans l'appli installée : aucun bouton
+  if (!btn) return;
 
   const ua = navigator.userAgent;
   const isIOS = /iphone|ipad|ipod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   const isAndroid = /android/i.test(ua);
   const isSafari = /safari/i.test(ua) && !/chrome|crios|fxios|edg|android/i.test(ua);
   const isFirefox = /firefox|fxios/i.test(ua);
+  // Chrome, Edge, Samsung Internet… ne proposent l'installation que si l'appli
+  // n'est PAS déjà installée : le bouton n'apparaît alors que sur leur signal.
+  const promptCapable = 'onbeforeinstallprompt' in window;
   let deferred = null;
 
-  btn.hidden = false;
+  btn.hidden = promptCapable ? true : knownInstalled();
+  // Le lien « Installer l'appli » des règles reste disponible sur iPhone/Safari
+  // (on ne peut pas y détecter l'installation), même si le bouton est masqué.
+  for (const el of extra) el.hidden = promptCapable;
 
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferred = e;
+    unmarkInstalled(); // le navigateur propose l'installation : elle n'est pas (ou plus) faite
+    btn.hidden = false;
+    for (const el of extra) el.hidden = false;
   });
   window.addEventListener('appinstalled', () => {
     deferred = null;
+    markInstalled();
     btn.hidden = true;
+    for (const el of extra) el.hidden = true;
     if (dlg.open) dlg.close();
   });
 
@@ -87,20 +106,32 @@
     h += '<p class="small-note">Une fois installée, Ortie se lance depuis votre écran d’accueil, en plein écran, et fonctionne même sans connexion.</p>';
     if (!window.isSecureContext) h += '<p class="note">L’installation demande une adresse sécurisée (https). Ouvrez le jeu depuis son adresse https.</p>';
     body.innerHTML = h;
+    if (doneBtn) doneBtn.hidden = false;
     dlg.showModal();
   }
 
-  btn.addEventListener('click', async () => {
+  async function install() {
     if (deferred) {
       const ev = deferred;
       deferred = null;
       ev.prompt();
       try {
         const choice = await ev.userChoice;
-        if (choice && choice.outcome === 'accepted') btn.hidden = true;
+        if (choice && choice.outcome === 'accepted') { markInstalled(); btn.hidden = true; }
       } catch (e) { /* ignore */ }
       return;
     }
     openGuide();
+  }
+  btn.addEventListener('click', install);
+  for (const el of extra) el.addEventListener('click', (e) => { e.preventDefault(); install(); });
+
+  // iPhone / Safari / Firefox : impossible de savoir si l'appli est installée,
+  // le joueur peut donc masquer le bouton lui-même.
+  const doneBtn = document.getElementById('btn-installed');
+  if (doneBtn) doneBtn.addEventListener('click', () => {
+    markInstalled();
+    btn.hidden = true;
+    if (dlg.open) dlg.close();
   });
 })();

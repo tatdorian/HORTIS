@@ -51,6 +51,8 @@ docker run -p 3000:3000 -e PORT=3000 ortie
 - Sur téléphone, **deux touchers rapides** sur la carte (sur le plateau ou dans la main) la tournent d'un quart de tour. Un toucher simple ailleurs sur le plateau y déplace la carte.
 - Les gestes au doigt utilisent les évènements tactiles natifs (fiables sur Safari iOS). Le zoom au double toucher, le pincement et le rebond de la page sont bloqués. La barre du bas a une hauteur fixe, pour que le plateau ne change jamais de taille pendant un geste.
 - Le numéro de version s'affiche dans les règles (« ? ») et dans le panneau Détails. Une appli installée se met à jour automatiquement à l'ouverture.
+- Les textes de la barre du bas tiennent toujours sur une ligne : la police rétrécit si besoin, pour que l'écran ne change jamais de taille.
+- Le bouton **Télécharger** disparaît quand l'appli est installée. Sur Chrome, Edge et Android, il n'apparaît que si le navigateur propose vraiment l'installation. Sur iPhone et Safari, qui ne permettent pas de le détecter, le bouton « Elle est déjà installée » du guide le masque ; un lien « installer l'appli » reste dans les règles.
 - Sur téléphone, l'écran est fixe comme une application : le plateau ne bouge jamais pendant qu'on déplace une carte. Le score et la réserve s'affichent en haut ; un toucher ouvre le panneau « Détails » (score, réserve, recettes).
 - Chaque case recouverte affiche le dé obtenu, ou une croix rouge si la pose est interdite. Le nombre de fruits gagnés s'affiche sur la carte et sur le bouton **Poser**.
 - **Conseil** (💡) propose le coup qui rapporte le plus de fruits ce tour-ci.
