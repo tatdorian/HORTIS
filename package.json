@@ -1,0 +1,15 @@
+{
+  "name": "hortis",
+  "version": "1.0.0",
+  "description": "Hortis — le casse-tête solo du verger en 9 cartes, version web.",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "UNLICENSED"
+}

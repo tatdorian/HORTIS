@@ -1,0 +1,9 @@
+# Déploiement Nixpacks : application Node sans dépendance ni étape de build.
+providers = ["node"]
+
+[variables]
+NODE_ENV = "production"
+NIXPACKS_NODE_VERSION = "20"
+
+[start]
+cmd = "node server.js"

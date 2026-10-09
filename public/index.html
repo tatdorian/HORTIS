@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hortis — le verger solo</title>
+  <meta name="description" content="Hortis : le casse-tête solo du verger en 9 cartes. Superposez les arbres de même essence pour récolter un maximum de fruits.">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Nunito:wght@400;600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 64 64" aria-hidden="true"><use href="#logo-mark"/></svg>
+      <div>
+        <h1>Hortis</h1>
+        <p class="tag">Le verger solo en 9 cartes</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <span class="seed" title="Partagez ce numéro pour jouer la même partie (mode compétitif)">Partie n° <b id="seed-label">—</b></span>
+      <button id="btn-undo" class="btn ghost" title="Annuler (Ctrl+Z)">↶ Annuler</button>
+      <button id="btn-rules" class="btn ghost">Règles</button>
+      <button id="btn-new" class="btn">Nouvelle partie</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="board-wrap" aria-label="Votre verger">
+      <svg id="board" class="board" xmlns="http://www.w3.org/2000/svg"></svg>
+      <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    </section>
+
+    <aside class="side">
+      <div class="panel score-panel">
+        <div class="score-big"><span id="score-total">0</span><small>fruits</small></div>
+        <div id="score-detail" class="score-detail"></div>
+        <div id="objective" class="objective" hidden></div>
+      </div>
+
+      <div class="panel">
+        <h2>Réserve</h2>
+        <div id="reserve" class="reserve"></div>
+        <div class="tokens">
+          <div id="tok-barrow" class="token-slot" title="Brouette : remplace un Panier recouvert par la même essence (15 fruits)"></div>
+          <div id="tok-squirrel" class="token-slot" title="Écureuil : une fois par partie, recouvrez un arbre d'une autre essence"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Pioche</h2>
+        <div class="deck-line">
+          <div id="deck" class="deck"></div>
+          <div class="deck-info"><b id="deck-count">0</b> carte(s) à piocher<br><span id="turn-info"></span></div>
+        </div>
+      </div>
+
+      <div id="recipes" class="panel" hidden>
+        <h2>Recettes</h2>
+        <div id="recipe-list"></div>
+      </div>
+    </aside>
+  </main>
+
+  <footer class="hand-bar">
+    <div class="hand-title">Votre main</div>
+    <div id="hand" class="hand"></div>
+    <div class="controls">
+      <button id="btn-rot-l" class="btn round" title="Pivoter à gauche (Q)">⟲</button>
+      <button id="btn-rot-r" class="btn round" title="Pivoter à droite (R / E)">⟳</button>
+      <button id="btn-squirrel" class="btn squirrel-btn" aria-pressed="false" title="Utiliser l'Écureuil pour ce coup">
+        <svg viewBox="0 0 64 64" aria-hidden="true"><use href="#squirrel"/></svg><span>Écureuil</span>
+      </button>
+      <button id="btn-place" class="btn primary" disabled>Poser la carte</button>
+    </div>
+    <div id="hint" class="hint">Choisissez une carte, puis placez-la sur le verger.</div>
+  </footer>
+
+  <dialog id="dlg-new" class="dlg">
+    <form method="dialog">
+      <h2>Nouvelle partie</h2>
+      <label class="field">Numéro de partie
+        <input id="in-seed" name="seed" inputmode="numeric" autocomplete="off" placeholder="aléatoire">
+        <small>Deux joueurs avec le même numéro reçoivent exactement les mêmes 9 cartes, dans le même ordre (mode compétitif).</small>
+      </label>
+      <label class="check"><input id="in-recipes" type="checkbox"> Jouer avec 2 cartes Recette (objectif de score + bonus)</label>
+      <div class="dlg-actions">
+        <button value="cancel" class="btn ghost">Annuler</button>
+        <button id="btn-start" value="start" class="btn primary">Planter le verger</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="dlg-end" class="dlg">
+    <form method="dialog">
+      <h2 id="end-title">Récolte terminée</h2>
+      <div id="end-body"></div>
+      <div class="dlg-actions">
+        <button value="close" class="btn ghost">Voir le verger</button>
+        <button id="btn-again" value="again" class="btn ghost">Rejouer cette partie</button>
+        <button id="btn-next" value="next" class="btn primary">Nouvelle partie</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="dlg-rules" class="dlg rules">
+    <form method="dialog">
+      <h2>Règles d’Hortis</h2>
+      <div class="rules-body">
+        <p><b>But :</b> agrandir votre verger en superposant des cartes pour récolter un maximum de fruits. Une partie utilise <b>9 cartes</b> parmi les 18.</p>
+        <h3>Mise en place</h3>
+        <p>La première carte forme votre Verger. Vous avez <b>2 cartes en main</b> ; les 6 autres forment la pioche. La réserve contient 5 dés de chaque fruit (oranges, citrons jaunes, citrons verts), le jeton Brouette et le jeton Écureuil.</p>
+        <h3>Tour de jeu</h3>
+        <ol>
+          <li><b>Posez</b> une carte de votre main dans le Verger. Vous pouvez la tourner de 90° ou 180°. Elle doit être alignée sur les cases et <b>recouvrir au moins une case</b>.</li>
+          <li><b>Placez les dés</b> : chaque arbre qui recouvre un arbre de <b>même essence</b> reçoit un dé de sa couleur dont la valeur est le total des fruits des deux arbres (ou la valeur du dé recouvert + les fruits du nouvel arbre). Un arbre ne peut pas recouvrir un arbre d’une autre essence.</li>
+          <li><b>Piochez</b> une carte.</li>
+        </ol>
+        <h3>Panier et Brouette</h3>
+        <p>Si la valeur d’un dé dépasse 6, il passe sur sa face <b>Panier</b> (10 fruits). Si un Panier est recouvert par un arbre de la même essence, remplacez-le par le jeton <b>Brouette</b> (15 fruits). Si la Brouette est déjà en jeu, le dé reste sur 10.</p>
+        <h3>Clairières</h3>
+        <p>Une clairière peut recouvrir n’importe quelle case. Si elle recouvre un dé, celui-ci est déplacé sur la clairière sans changer de valeur. Un arbre de n’importe quelle essence peut recouvrir une clairière vide ; il peut recouvrir une clairière portant un dé de sa couleur (le dé augmente des fruits de l’arbre).</p>
+        <p class="warn">Un dé resté sur une clairière en fin de partie ne rapporte rien : le fruit est tombé au sol et a pourri.</p>
+        <h3>L’Écureuil</h3>
+        <p>Une fois par partie, vous pouvez recouvrir un arbre (ou un dé) d’une autre essence. Le dé recouvert retourne à la réserve et l’Écureuil est placé sur le nouvel arbre, qui ne pourra plus être recouvert.</p>
+        <h3>Réserve épuisée</h3>
+        <p>S’il ne vous reste plus de dé de la couleur voulue, vous n’en placez pas.</p>
+        <h3>Fin de partie</h3>
+        <p>La partie s’arrête quand la 9<sup>e</sup> carte est posée (ou si aucune carte ne peut être posée). Additionnez les dés posés sur des arbres (et la Brouette).</p>
+        <h3>Recettes &amp; mode compétitif</h3>
+        <p>Avec les Recettes, deux cartes Recette sont tirées : additionnez leurs nombres pour obtenir l’objectif de score, et gagnez leur bonus si leur condition est remplie. En multijoueur, chacun saisit le même numéro de partie et le meilleur score l’emporte (égalité : le plus de dés utilisés).</p>
+        <h3>Commandes</h3>
+        <p><kbd>1</kbd>/<kbd>2</kbd> choisir une carte · <kbd>R</kbd>/<kbd>Q</kbd> ou molette : pivoter · clic : poser · <kbd>Ctrl</kbd>+<kbd>Z</kbd> annuler · <kbd>Échap</kbd> désélectionner. Sur mobile : touchez le verger pour positionner, puis « Poser la carte ».</p>
+      </div>
+      <div class="dlg-actions"><button class="btn primary" value="ok">À la cueillette !</button></div>
+    </form>
+  </dialog>
+
+  <!-- Bibliothèque graphique -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <radialGradient id="g-orange" cx="35%" cy="30%" r="70%"><stop offset="0" stop-color="#ffd08a"/><stop offset=".45" stop-color="#f7931e"/><stop offset="1" stop-color="#c85d0a"/></radialGradient>
+      <radialGradient id="g-citron" cx="35%" cy="30%" r="70%"><stop offset="0" stop-color="#fff7b0"/><stop offset=".45" stop-color="#f6d419"/><stop offset="1" stop-color="#c9a400"/></radialGradient>
+      <radialGradient id="g-vert" cx="35%" cy="30%" r="70%"><stop offset="0" stop-color="#e3f7a6"/><stop offset=".45" stop-color="#86c43a"/><stop offset="1" stop-color="#4f8a1c"/></radialGradient>
+      <radialGradient id="g-crown" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="#5fa35a"/><stop offset=".7" stop-color="#2f7a43"/><stop offset="1" stop-color="#1f5a33"/></radialGradient>
+      <radialGradient id="g-crown2" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="#77b766"/><stop offset=".7" stop-color="#3d8a49"/><stop offset="1" stop-color="#276a3a"/></radialGradient>
+      <linearGradient id="g-meadow" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d8eab0"/><stop offset="1" stop-color="#b9d98a"/></linearGradient>
+      <linearGradient id="g-paper" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fffaf0"/><stop offset="1" stop-color="#f3e8d2"/></linearGradient>
+      <linearGradient id="g-wood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e7c08a"/><stop offset="1" stop-color="#b98447"/></linearGradient>
+      <linearGradient id="g-back" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2f6b4f"/><stop offset="1" stop-color="#1d4a37"/></linearGradient>
+      <pattern id="p-back" width="24" height="24" patternUnits="userSpaceOnUse">
+        <circle cx="6" cy="6" r="2.2" fill="#f7931e" opacity=".55"/><circle cx="18" cy="18" r="2.2" fill="#f6d419" opacity=".55"/><circle cx="18" cy="6" r="1.4" fill="#86c43a" opacity=".6"/><circle cx="6" cy="18" r="1.4" fill="#86c43a" opacity=".6"/>
+      </pattern>
+      <filter id="f-shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="3" stdDeviation="3.5" flood-color="#2b2116" flood-opacity=".35"/></filter>
+      <filter id="f-soft" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="1.5" stdDeviation="1.2" flood-color="#2b2116" flood-opacity=".35"/></filter>
+
+      <!-- Fruits -->
+      <g id="fruit-orange"><circle r="7" fill="url(#g-orange)" stroke="#8c3f05" stroke-width=".8"/><circle cx="-2.3" cy="-2.5" r="1.6" fill="#fff" opacity=".6"/><path d="M0-7 q2.5-3 5-2.2 q-1.2 2.6-5 2.2z" fill="#3b8a3a"/></g>
+      <g id="fruit-citron"><ellipse rx="8" ry="6" fill="url(#g-citron)" stroke="#8a6f00" stroke-width=".8"/><path d="M-8 0 l-2.2 -.8 l0 1.6z M8 0 l2.2 -.8 l0 1.6z" fill="#c9a400"/><ellipse cx="-2.5" cy="-2.3" rx="2" ry="1.2" fill="#fff" opacity=".6"/></g>
+      <g id="fruit-vert"><circle r="6.6" fill="url(#g-vert)" stroke="#355f12" stroke-width=".8"/><circle cx="-2.2" cy="-2.2" r="1.5" fill="#fff" opacity=".55"/><path d="M0-6.6 q-3-3 -6-1.6 q2 2.4 6 1.6z" fill="#2f6e2c"/></g>
+
+      <!-- Écureuil -->
+      <g id="squirrel">
+        <circle cx="32" cy="32" r="30" fill="#fdf2dc" stroke="#7a4a21" stroke-width="3"/>
+        <path d="M40 50c10-2 14-12 11-21-2-7-9-11-14-9 5 3 7 8 5 13-2 5-7 7-11 7" fill="#c06a2b" stroke="#7a3d14" stroke-width="1.5"/>
+        <ellipse cx="29" cy="41" rx="10" ry="11" fill="#d9813a" stroke="#7a3d14" stroke-width="1.5"/>
+        <circle cx="23" cy="26" r="8" fill="#d9813a" stroke="#7a3d14" stroke-width="1.5"/>
+        <path d="M19 19l-1-6 5 4z M26 18l2-6 2 6z" fill="#c06a2b" stroke="#7a3d14" stroke-width="1.2"/>
+        <circle cx="20.5" cy="25" r="1.6" fill="#2a1a0e"/>
+        <circle cx="15.6" cy="28.5" r="1.3" fill="#2a1a0e"/>
+        <ellipse cx="27" cy="44" rx="5" ry="6" fill="#f3c48c"/>
+        <circle cx="22" cy="38" r="4" fill="#8a5a2b" stroke="#5a3515"/><path d="M19.5 35.5h5" stroke="#5a3515" stroke-width="2"/>
+      </g>
+
+      <!-- Brouette -->
+      <g id="barrow">
+        <circle cx="32" cy="32" r="30" fill="url(#g-wood)" stroke="#6e4317" stroke-width="3"/>
+        <path d="M12 24h34l-5 15H17z" fill="#6aa84f" stroke="#2f5a1f" stroke-width="2" stroke-linejoin="round"/>
+        <use href="#fruit-orange" transform="translate(22 22) scale(.8)"/><use href="#fruit-citron" transform="translate(32 20) scale(.8)"/><use href="#fruit-vert" transform="translate(41 23) scale(.8)"/>
+        <path d="M46 26l9-5M17 39l-3 9M41 39l3 9" stroke="#4a2b10" stroke-width="2.6" stroke-linecap="round"/>
+        <circle cx="29" cy="46" r="6" fill="#3a2a1a" stroke="#1d140c" stroke-width="2"/><circle cx="29" cy="46" r="2" fill="#a88a5a"/>
+      </g>
+
+      <!-- Panier -->
+      <g id="basket">
+        <path d="M-15 -2 Q0 -22 15 -2" fill="none" stroke="#7a4a21" stroke-width="3"/>
+        <use href="#fruit-orange" transform="translate(-7 -4) scale(.8)"/><use href="#fruit-citron" transform="translate(2 -6) scale(.75)"/><use href="#fruit-vert" transform="translate(8 -3) scale(.75)"/>
+        <path d="M-17 -2h34l-4 15h-26z" fill="#c98d4b" stroke="#6e4317" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M-14 3h28M-12 8h24M-8 -2v15M0 -2v15M8 -2v15" stroke="#8a5a2b" stroke-width="1.3"/>
+      </g>
+
+      <!-- Logo -->
+      <g id="logo-mark">
+        <circle cx="32" cy="32" r="30" fill="#2f6b4f"/>
+        <rect x="29" y="34" width="6" height="18" rx="2" fill="#7a4a21"/>
+        <circle cx="32" cy="26" r="17" fill="url(#g-crown2)"/>
+        <use href="#fruit-orange" transform="translate(25 22) scale(.9)"/>
+        <use href="#fruit-citron" transform="translate(39 25) scale(.9)"/>
+        <use href="#fruit-vert" transform="translate(30 34) scale(.9)"/>
+      </g>
+    </defs>
+  </svg>
+
+  <script src="core.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
