@@ -486,7 +486,6 @@ kbd { background: var(--surface-2); border: 1px solid var(--line); border-bottom
   .details-chip .lbl-fruits, .details-chip .caret { display: none; }
   .details-chip { padding: 3px 10px; }
   .details-chip .res-mini { gap: 4px; margin-left: 4px; padding-left: 6px; }
-  #btn-rules { display: none; } /* les règles restent dans le menu (logo) */
   .details-chip .who-dot { display: none !important; } /* le joueur est indiqué sur le plateau */
 }
 @media (max-width: 360px) {

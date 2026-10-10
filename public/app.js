@@ -4,7 +4,7 @@
   const H = window.OrtieCore;
   const S = 100; // taille d'une case en unités SVG
   const CW = H.CARD_W * S, CH = H.CARD_H * S;
-  const APP_VERSION = '1.8';
+  const APP_VERSION = '1.9';
   const STORE_KEY = 'ortie.save.v3';
   const OLD_STORE_KEY = 'ortie.save.v2';
   const SEEN_KEY = 'ortie.seenRules';
@@ -45,7 +45,7 @@
     btnDetails: $('btn-details'), btnSideClose: $('btn-side-close'), sideBackdrop: $('side-backdrop'), boardWrap: document.querySelector('.board-wrap'), scoreRank: $('score-rank'), scoreRows: $('score-rows'), objective: $('objective'),
     recipes: $('recipes'), recipeList: $('recipe-list'), seed: $('seed-label'), turn: $('turn-label'),
     hint: $('hint'), toast: $('toast'),
-    btnUndo: $('btn-undo'), btnNew: $('btn-new'), btnRules: $('btn-rules'), btnPlace: $('btn-place'),
+    btnUndo: $('btn-undo'), btnNew: $('btn-new'), btnPlace: $('btn-place'),
     placeLabel: $('place-label'), placeGain: $('place-gain'),
     btnRotL: $('btn-rot-l'), btnRotR: $('btn-rot-r'), btnHint: $('btn-hint'),
     dlgNew: $('dlg-new'), dlgEnd: $('dlg-end'), dlgRules: $('dlg-rules'), dlgSquirrel: $('dlg-squirrel'),
@@ -147,7 +147,8 @@
     const sc = opts.scale || 1;
     const cls = 'die' + (opts.cls ? ' ' + opts.cls : '');
     if (die.barrow) {
-      return `<g transform="translate(${cx} ${cy}) scale(${sc})"><g class="${cls}" filter="url(#f-shadow)"><g transform="translate(-31 -31) scale(.97)"><use href="#barrow"/></g><g transform="translate(22 22)"><circle r="13" fill="#fffaf0" stroke="#6e4317" stroke-width="2"/><text y="5" text-anchor="middle" class="die-num">15</text></g></g></g>`;
+      const edge = DIE_EDGE[die.t] || '#6e4317';
+      return `<g transform="translate(${cx} ${cy}) scale(${sc})"><g class="${cls}" filter="url(#f-shadow)"><g transform="translate(-31 -31) scale(.97)">${barrowArt(die.t)}</g><g transform="translate(22 22)"><circle r="13" fill="#fffaf0" stroke="${edge}" stroke-width="2"/><text y="5" text-anchor="middle" class="die-num">15</text></g></g></g>`;
     }
     const sz = 52;
     let g = `<g transform="translate(${cx} ${cy}) scale(${sc})"><g class="${cls}" filter="url(#f-shadow)">`;
@@ -161,6 +162,30 @@
     }
     if (opts.lost) g += `<path d="M-20-20L20 20M20-20L-20 20" stroke="#7a2e1a" stroke-width="5" stroke-linecap="round" opacity=".7"/>`;
     g += `</g></g>`;
+    return g;
+  }
+
+  // Jeton Brouette (64 × 64) : fond de la couleur du fruit qui l'a remplie,
+  // brouette en bois (jamais verte, pour rester lisible sur un fond vert).
+  // Sans fruit (`t` absent) : jeton générique en bois, avec les trois fruits.
+  function barrowArt(t) {
+    const fill = t ? DIE_FILL[t] : 'url(#g-wood)';
+    const edge = t ? DIE_EDGE[t] : '#6e4317';
+    const fr = t ? [t, t, t] : ['orange', 'citron', 'vert'];
+    const fruit = (f, x, y, sc) => `<use href="#fruit-${f}" transform="translate(${x} ${y}) rotate(${f === 'citron' ? -24 : 0}) scale(${sc})"/>`;
+    let g = `<circle cx="32" cy="32" r="30" fill="${fill}" stroke="#fffaf0" stroke-width="3.5"/>`;
+    g += `<circle cx="32" cy="32" r="31.5" fill="none" stroke="${edge}" stroke-width="1.6"/>`;
+    g += '<circle cx="32" cy="32" r="25.5" fill="none" stroke="#fff" stroke-width="1.2" opacity=".35"/>';
+    g += '<ellipse cx="25" cy="16" rx="12" ry="5" fill="#fff" opacity=".18"/>';
+    // fruits qui dépassent de la caisse
+    g += fruit(fr[0], 21, 22, 0.58) + fruit(fr[1], 31, 19, 0.58) + fruit(fr[2], 41, 22, 0.58);
+    // caisse en bois
+    g += '<path d="M11 25h36l-5.5 15H16.5z" fill="#b97a3d" stroke="#5a3515" stroke-width="2" stroke-linejoin="round"/>';
+    g += '<path d="M13.5 30.5h31M15.5 35.5h27" stroke="#8a5424" stroke-width="1.4"/>';
+    g += '<path d="M12.5 26.5h33" stroke="#e2a96a" stroke-width="1.2" opacity=".8"/>';
+    // poignées, pieds et roue
+    g += '<path d="M46 27l9.5-5.5M18 40l-3 8.5M40.5 40l3 8.5" stroke="#4a2b10" stroke-width="2.8" stroke-linecap="round"/>';
+    g += '<circle cx="29" cy="46.5" r="6.2" fill="#3a2a1a" stroke="#1d140c" stroke-width="2"/><circle cx="29" cy="46.5" r="2" fill="#c9a77a"/>';
     return g;
   }
 
@@ -491,8 +516,9 @@
       r += `<div class="res-row" title="${H.FRUIT_LABEL[t]} : ${state.reserve[t]} dé(s) en réserve"><div class="dice">${dice}</div><span class="cnt">${state.reserve[t]}/${H.DICE_PER_TYPE}</span></div>`;
     }
     els.reserve.innerHTML = r;
-    els.barrow.className = 'token' + (state.barrowFree ? '' : ' used');
-    els.barrow.innerHTML = `<svg viewBox="0 0 64 64"><use href="#barrow"/></svg><span><b>Brouette</b><small>${state.barrowFree ? 'libre · 15 fruits' : 'en jeu'}</small></span>`;
+    const bw = Object.values(state.board).find((e) => e.die && e.die.barrow);
+    els.barrow.className = 'token';
+    els.barrow.innerHTML = `<svg viewBox="0 0 64 64">${barrowArt(bw ? bw.die.t : null)}</svg><span><b>Brouette</b><small>${bw ? 'en jeu · ' + H.FRUIT_LABEL[bw.die.t].toLowerCase() : state.barrowFree ? 'libre · 15 fruits' : 'en jeu'}</small></span>`;
     els.squirrel.className = 'token' + (state.squirrelUsed ? ' used' : '');
     els.squirrel.innerHTML = `<svg viewBox="0 0 64 64"><use href="#squirrel"/></svg><span><b>Écureuil</b><small>${state.squirrelUsed ? 'utilisé' : '1 fois / partie'}</small></span>`;
 
@@ -929,7 +955,7 @@
     h += tile(cellSvg({ k: 'clear' }, 50, 50, 7), 'Clairière');
     h += `<figure><svg viewBox="-50 -50 100 100">${dieSvg({ t: 'orange', v: 3 }, 0, 0, { scale: 1.3 })}</svg><figcaption>Dé de fruits</figcaption></figure>`;
     h += `<figure><svg viewBox="-50 -50 100 100">${dieSvg({ t: 'citron', v: 10 }, 0, 0, { scale: 1.3 })}</svg><figcaption>Panier · 10</figcaption></figure>`;
-    h += `<figure><svg viewBox="-50 -50 100 100">${dieSvg({ t: 'vert', v: 15, barrow: true }, 0, 0, { scale: 1.2 })}</svg><figcaption>Brouette · 15</figcaption></figure>`;
+    h += `<figure><svg viewBox="-50 -50 100 100">${dieSvg({ t: 'orange', v: 15, barrow: true }, 0, 0, { scale: 1.2 })}</svg><figcaption>Brouette · 15</figcaption></figure>`;
     h += `<figure><svg viewBox="-50 -50 100 100">${squirrelSvg(0, 0, 1.3)}</svg><figcaption>Écureuil</figcaption></figure>`;
     els.legend.innerHTML = h;
   }
@@ -1069,7 +1095,6 @@
   els.btnPlace.addEventListener('click', tryPlace);
   els.btnHint.addEventListener('click', suggest);
   els.btnUndo.addEventListener('click', undo);
-  els.btnRules.addEventListener('click', () => openDialog(els.dlgRules));
 
   function openNew(mode) {
     els.inSeed.value = '';
@@ -1158,6 +1183,7 @@
     if (e.target && /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); return; }
     const k = e.key.toLowerCase();
+    if (k === '?') { openDialog(els.dlgRules); return; }
     if (k === '1' || k === '2') { const id = state.hand[Number(k) - 1]; if (id) selectCard(id); }
     else if (k === 'r' || k === 'e') rotate(1);
     else if (k === 'q') rotate(-1);
