@@ -4,7 +4,7 @@
   const H = window.OrtieCore;
   const S = 100; // taille d'une case en unités SVG
   const CW = H.CARD_W * S, CH = H.CARD_H * S;
-  const APP_VERSION = '1.22';
+  const APP_VERSION = '1.23';
   const STORE_KEY = 'ortie.save.v3';
   const OLD_STORE_KEY = 'ortie.save.v2';
   const SEEN_KEY = 'ortie.seenRules';
@@ -1922,9 +1922,10 @@
   const KIND_PREF = { board: 'board', cards: 'cards', dice: 'dice', accent: 'accent' };
   const isLocked = (kind, id) => A.rewardLocked(ach, kind, id);
   function lockBadge(kind, id) {
-    if (!isLocked(kind, id)) return A.rewardOwner(kind, id) ? '<span class="opt-reward" title="Récompense d’achievement">🏆</span>' : '';
-    return '<span class="opt-lock" aria-hidden="true">🔒</span>';
+    if (!isLocked(kind, id)) return A.rewardOwner(kind, id) ? '<span class="opt-badge" title="Récompense d’achievement">🏆</span>' : '';
+    return '<span class="opt-badge lock" aria-hidden="true">🔒</span>';
   }
+  const prev = (inner, badge) => `<span class="opt-prev">${inner}${badge || ''}</span>`;
   function optAttrs(kind, id, on) {
     const locked = isLocked(kind, id);
     return `class="opt${on ? ' on' : ''}${locked ? ' locked' : ''}" aria-pressed="${on}"${locked ? ' aria-disabled="true"' : ''}`;
@@ -1953,16 +1954,16 @@
   function renderCustom() {
     $('custom-lock').hidden = true;
     els.optThemes.innerHTML = Object.entries(THEMES).map(([id, name]) =>
-      `<button type="button" class="opt${prefs.theme === id ? ' on' : ''}" data-theme-opt="${id}" aria-pressed="${prefs.theme === id}"><span class="theme-swatch" data-t="${id}"><i></i><i></i><i></i></span><span class="opt-name">${name}</span></button>`).join('');
+      `<button type="button" class="opt${prefs.theme === id ? ' on' : ''}" data-theme-opt="${id}" aria-pressed="${prefs.theme === id}">${prev(`<span class="theme-swatch" data-t="${id}"><i></i><i></i><i></i></span>`)}<span class="opt-name">${id === 'auto' ? '<span class="nm-full">Automatique</span><span class="nm-short">Auto</span>' : name}</span></button>`).join('');
     els.optBoards.innerHTML = Object.entries(BOARDS).map(([id, name]) =>
-      `<button type="button" ${optAttrs('board', id, prefs.board === id)} data-board-opt="${id}"><span class="swatch" data-board="${id}"></span>${lockBadge('board', id)}<span class="opt-name">${name}</span></button>`).join('');
+      `<button type="button" ${optAttrs('board', id, prefs.board === id)} data-board-opt="${id}">${prev(`<span class="swatch" data-board="${id}"></span>`, lockBadge('board', id))}<span class="opt-name">${name}</span></button>`).join('');
     els.optCards.innerHTML = Object.entries(CARD_THEMES).map(([id, T]) =>
-      `<button type="button" ${optAttrs('cards', id, prefs.cards === id)} data-card-opt="${id}"><svg viewBox="-6 -4 312 212" aria-hidden="true">${cardArt(H.cardById(9), id)}</svg>${lockBadge('cards', id)}<span class="opt-name">${T.name}</span></button>`).join('');
+      `<button type="button" ${optAttrs('cards', id, prefs.cards === id)} data-card-opt="${id}">${prev(`<svg viewBox="-6 -4 312 212" aria-hidden="true">${cardArt(H.cardById(9), id)}</svg>`, lockBadge('cards', id))}<span class="opt-name">${T.name}</span></button>`).join('');
     els.optAccents.innerHTML = Object.entries(ACCENTS).map(([id, C]) =>
-      `<button type="button" ${optAttrs('accent', id, prefs.accent === id)} data-accent-opt="${id}"><span class="accent-swatch" style="--b:${C.brand};--a:${C.accent}"><i></i><i></i></span>${lockBadge('accent', id)}<span class="opt-name">${C.name}</span></button>`).join('');
+      `<button type="button" ${optAttrs('accent', id, prefs.accent === id)} data-accent-opt="${id}">${prev(`<span class="accent-swatch" style="--b:${C.brand};--a:${C.accent}"><i></i><i></i></span>`, lockBadge('accent', id))}<span class="opt-name">${C.name}</span></button>`).join('');
     const dice = (st) => [['orange', 5, -58], ['citron', 3, 0], ['vert', 6, 58]].map(([t, v, x]) => dieSvg({ t, v }, x, 0, { scale: 0.92, style: st })).join('');
     els.optDice.innerHTML = Object.entries(DICE_STYLES).map(([id, name]) =>
-      `<button type="button" ${optAttrs('dice', id, prefs.dice === id)} data-dice-opt="${id}"><svg viewBox="-92 -34 184 70" aria-hidden="true">${dice(id)}</svg>${lockBadge('dice', id)}<span class="opt-name">${name}</span></button>`).join('');
+      `<button type="button" ${optAttrs('dice', id, prefs.dice === id)} data-dice-opt="${id}">${prev(`<svg viewBox="-92 -34 184 70" aria-hidden="true">${dice(id)}</svg>`, lockBadge('dice', id))}<span class="opt-name">${name}</span></button>`).join('');
   }
   function customChanged() {
     savePrefs(); applyPrefs(); renderCustom(); renderAll(); renderLegend(); achStyle();
@@ -1970,7 +1971,16 @@
   function achStyle() {
     if (prefs.board !== 'oak' && prefs.cards !== 'classic' && prefs.dice !== 'classic' && prefs.accent !== 'verger') achSaved(A.onEvent(ach, 'styliste'));
   }
-  function openCustom() { renderCustom(); openDialog(els.dlgCustom); }
+  // Onglets de Personnaliser : une catégorie à la fois (moins de défilement).
+  function showCustomTab(tab) {
+    for (const el of els.dlgCustom.querySelectorAll('.ctab')) el.hidden = el.dataset.tab !== tab;
+    const r = els.dlgCustom.querySelector(`input[name=ctab][value="${tab}"]`);
+    if (r) r.checked = true;
+    ui.customTab = tab;
+    els.dlgCustom.scrollTop = 0;
+  }
+  for (const r of document.querySelectorAll('#dlg-custom input[name=ctab]')) r.addEventListener('change', () => { $('custom-lock').hidden = true; showCustomTab(r.value); });
+  function openCustom() { renderCustom(); showCustomTab(ui.customTab || 'general'); openDialog(els.dlgCustom); }
   function openSettings() { renderSound(); openDialog(els.dlgSettings); }
 
   const sndEls = { music: $('in-music'), sfx: $('in-sfx'), musicVol: $('in-music-vol'), sfxVol: $('in-sfx-vol'), musicVal: $('music-val'), sfxVal: $('sfx-val') };
