@@ -631,3 +631,8 @@ kbd { background: var(--surface-2); border: 1px solid var(--line); border-bottom
 .theme-swatch[data-t="auto"] i:nth-child(3) { background: #222a1e; }
 .dlg .menu-sec-title { margin: 0; font: 800 12px 'Nunito', sans-serif; letter-spacing: .8px; text-transform: uppercase; color: var(--brand); }
 .menu .menu-item { padding: 10px 14px; }
+
+.rprog { margin-top: 4px; font-size: 12px; font-weight: 800; color: var(--brand); background: rgba(47, 107, 58, .08); border-radius: 8px; padding: 2px 8px; display: inline-block; }
+.rcard .rprog { color: #2f6b3a; background: rgba(47, 107, 58, .1); }
+.rcard.ko { border-color: rgba(196, 69, 42, .45); }
+.rstate.ko { color: #fff; background: var(--bad); }

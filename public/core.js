@@ -141,7 +141,7 @@
     { id: 1, name: 'Tarte au citron vert', target: 44, color: 'vert', icon: 'pie', kind: 'double', t: 'vert', mult: 2, text: 'Tous <b>les dés verts</b> comptent double' },
     { id: 7, name: 'Punch', target: 40, color: null, icon: 'punch', kind: 'punch', mult: 2, text: '<b>Le fruit rapportant le moins de points</b> (avant application des bonus) compte double' },
     { id: 8, name: 'Cake aux fruits', target: 26, color: null, icon: 'cake', kind: 'cake', pts: 4, text: 'Au moins <b>1 clairière</b> doit être entourée <b>de 4 dés</b>', small: 'sur des arbres ou des clairières' },
-    { id: 13, name: 'Panier de fruits', target: 27, color: null, icon: 'basket', kind: 'basket', pts: 3, text: 'Au moins <b>1 panier</b> doit être en jeu', small: 'sur un arbre ou une clairière' },
+    { id: 13, name: 'Panier de fruits', target: 27, color: null, icon: 'basket', kind: 'basket', pts: 3, text: 'Au moins <b>1 panier</b> doit être en jeu', small: 'sur un arbre ou une clairière · la Brouette compte aussi' },
     { id: 14, name: 'Salade de fruits', target: 28, color: null, icon: 'bowl', kind: 'salad', pts: 6, text: 'Au moins <b>3 dés d’un même fruit</b> doivent être placés sur des arbres/clairières adjacents' },
     { id: 2, name: 'Cocktail de fruits', target: 29, color: null, icon: 'cocktail', kind: 'cocktail', pts: 5, text: 'Les <b>15 dés</b> doivent être en jeu', small: 'sur des arbres ou des clairières' },
     { id: 5, name: 'Tutti Frutti', target: 35, color: null, icon: 'cone', kind: 'tutti', pts: 10, text: 'Au moins <b>4 dés de chaque couleur</b> doivent être en jeu', small: 'sur des arbres ou des clairières' },
@@ -167,7 +167,8 @@
       case 'first': return (state.firstTurnDice || []).includes(r.t);
       case 'all5': return dice.filter((d) => d.t === r.t).length >= DICE_PER_TYPE;
       case 'six': return dice.some((d) => d.t === r.t && d.v === 6);
-      case 'basket': return dice.some((d) => d.v === BASKET);
+      // La Brouette est un Panier amélioré (Panier recouvert) : elle compte aussi.
+      case 'basket': return Object.values(state.board).some((e) => e.die && (e.die.barrow || e.die.v === BASKET));
       case 'cocktail': return dice.length >= DICE_PER_TYPE * TYPES.length;
       case 'tutti': return TYPES.every((t) => dice.filter((d) => d.t === t).length >= 4);
       case 'cake':
@@ -196,6 +197,59 @@
       }
       default: return true; // recettes « compte double » : toujours appliquées
     }
+  }
+
+  // Où en est une recette : texte court + « final » quand le résultat ne peut plus changer.
+  const COLOR_WORD = { orange: 'orange', citron: 'jaunes', vert: 'verts' };
+  function recipeProgress(state, r) {
+    const dice = diceInPlay(state);
+    const of = (t) => dice.filter((d) => d.t === t);
+    const final = !!state.over || (r.kind === 'first' && state.placed.length > 1);
+    let text = '';
+    switch (r.kind) {
+      case 'first':
+        text = state.placed.length <= 1 ? 'à faire avec votre 1re carte posée' : (state.firstTurnDice || []).includes(r.t) ? 'fait au 1er tour' : 'pas de dé ' + DIE_LABEL[r.t] + ' au 1er tour';
+        break;
+      case 'all5': text = of(r.t).length + '/5 dés ' + COLOR_WORD[r.t] + ' en jeu'; break;
+      case 'six': {
+        const vals = of(r.t).map((d) => d.v).sort((a, b) => a - b);
+        text = vals.length ? 'dés ' + COLOR_WORD[r.t] + ' : ' + vals.map((v) => (v >= BASKET ? 'panier' : v)).join(', ') : 'aucun dé ' + DIE_LABEL[r.t] + ' en jeu';
+        break;
+      }
+      case 'basket': {
+        const n = Object.values(state.board).filter((e) => e.die && (e.die.barrow || e.die.v === BASKET)).length;
+        text = n ? n + ' panier' + (n > 1 ? 's' : '') + ' en jeu (Brouette comprise)' : 'aucun panier en jeu';
+        break;
+      }
+      case 'cocktail': text = dice.length + '/15 dés en jeu'; break;
+      case 'tutti': text = TYPES.map((t) => DIE_LABEL[t] + ' ' + Math.min(of(t).length, 4) + '/4').join(' · '); break;
+      case 'cake': {
+        let best = 0;
+        for (const [k, e] of Object.entries(state.board)) {
+          if (e.cell.k !== 'clear') continue;
+          best = Math.max(best, neighbours(k).filter((n) => state.board[n] && state.board[n].die).length);
+        }
+        text = 'meilleure clairière : ' + best + '/4 dés autour';
+        break;
+      }
+      case 'salad': {
+        let best = 0;
+        const seen = new Set();
+        for (const [k, e] of Object.entries(state.board)) {
+          if (!e.die || seen.has(k)) continue;
+          let size = 0; const stack = [k]; seen.add(k);
+          while (stack.length) {
+            const c = stack.pop(); size++;
+            for (const n of neighbours(c)) { const ne = state.board[n]; if (ne && ne.die && ne.die.t === e.die.t && !seen.has(n)) { seen.add(n); stack.push(n); } }
+          }
+          best = Math.max(best, size);
+        }
+        text = 'plus grand groupe : ' + Math.min(best, 3) + '/3 dés';
+        break;
+      }
+      default: text = 'toujours appliquée'; break;
+    }
+    return { text, final };
   }
 
   function bounds(state) {
@@ -462,7 +516,8 @@
           bonus += r.pts;
           effect = r.pts;
         }
-        recipes.push(Object.assign({}, r, { done, effect, detail }));
+        const prog = recipeProgress(state, r);
+        recipes.push(Object.assign({}, r, { done, effect, detail, progress: prog.text, final: prog.final }));
       }
     }
     const scored = {};
@@ -494,6 +549,6 @@
     TYPES, TYPE_LABEL, FRUIT_LABEL, DIE_LABEL, DICE_PER_TYPE, BASKET, BARROW, CARD_W, CARD_H, GAME_CARDS,
     CARDS, RECIPES, RECIPE_BY_ID, RANKS,
     cardById, footprint, key, bounds, newGame, evaluate, play, legalMoves, hasAnyMove, bestMove, score, rank,
-    randomSeed, diceInPlay, recipeDone, gainOf,
+    randomSeed, diceInPlay, recipeDone, recipeProgress, gainOf,
   };
 });

@@ -4,7 +4,7 @@
   const H = window.OrtieCore;
   const S = 100; // taille d'une case en unités SVG
   const CW = H.CARD_W * S, CH = H.CARD_H * S;
-  const APP_VERSION = '1.13';
+  const APP_VERSION = '1.14';
   const STORE_KEY = 'ortie.save.v3';
   const OLD_STORE_KEY = 'ortie.save.v2';
   const SEEN_KEY = 'ortie.seenRules';
@@ -259,15 +259,20 @@
     const ink = INK[r.color || 'none'];
     const bonus = r.mult ? `Bonus <b>×${r.mult}</b>` : `Bonus <b>${r.pts}</b> pt${r.pts > 1 ? 's' : ''}`;
     let st = '';
+    let prog = '';
     if (status) {
       if (r.mult) st = `<span class="rstate on">${status.detail || 'actif'}</span>`;
-      else st = status.done ? '<span class="rstate ok">✔ réussie</span>' : '<span class="rstate">en cours</span>';
+      else if (status.done) st = '<span class="rstate ok">✔ réussie</span>';
+      else if (status.final) st = '<span class="rstate ko">✘ ratée</span>';
+      else st = '<span class="rstate">en cours</span>';
+      if (!r.mult && status.progress) prog = `<div class="rprog">${status.progress}</div>`;
     }
-    return `<div class="rcard${status && status.done && !r.mult ? ' done' : ''}">
+    return `<div class="rcard${status && status.done && !r.mult ? ' done' : status && status.final && !r.mult ? ' ko' : ''}">
       ${recipeBadge(r)}
       <div class="rbody">
         <div class="rname" style="color:${ink}">${r.name}</div>
         <div class="rtext">${r.text}${r.small ? ` <small>(${r.small})</small>` : ''}</div>
+        ${prog}
         <div class="rfoot"><span class="rbonus">${bonus}</span>${st}</div>
       </div>
       <svg viewBox="0 0 80 80" class="ricon" aria-hidden="true">${recipeIcon(r)}</svg>
@@ -865,7 +870,8 @@
     if (sc.lost) b += `<tr class="lost"><td><span class="dot rot"></span>Fruits pourris sur les clairières</td><td>0 <small>(${sc.lost})</small></td></tr>`;
     for (const r of sc.recipes) {
       const val = r.mult ? r.detail : r.done ? '+' + r.pts : '0';
-      b += `<tr><td>${r.done || r.mult ? '✔' : '✘'} ${r.name}</td><td>${val}</td></tr>`;
+      const why = !r.mult && !r.done && r.progress ? ` <small>(${r.progress})</small>` : '';
+      b += `<tr><td>${r.done || r.mult ? '✔' : '✘'} ${r.name}${why}</td><td>${val}</td></tr>`;
     }
     b += `<tr class="tot"><td>Total</td><td>${sc.total}</td></tr></table>`;
     if (sc.target != null) b += `<p class="verdict ${sc.won ? 'win' : 'lose'}">${sc.won ? `Objectif de ${sc.target} atteint : victoire !` : `Objectif de ${sc.target} manqué de ${sc.target - sc.total}.`}</p>`;

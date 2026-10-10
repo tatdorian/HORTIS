@@ -217,3 +217,37 @@ test('versions identiques : index.html (?v=), sw.js et app.js', () => {
   for (const v of htmlV) assert.strictEqual(v, appV);
   assert.strictEqual(swV, appV);
 });
+
+test('Panier de fruits : un Panier OU la Brouette (Panier amélioré) valide la recette', () => {
+  const R = H.RECIPE_BY_ID[13];
+  const s = blank();
+  put(s, 0, 0, tree('citron'), { t: 'citron', v: 6 });
+  assert.ok(!H.recipeDone(s, R));
+  s.board['0,0'].die = { t: 'citron', v: 10 };
+  assert.ok(H.recipeDone(s, R));
+  s.board['0,0'].die = { t: 'citron', v: 15, barrow: true }; // le Panier est devenu la Brouette
+  assert.ok(H.recipeDone(s, R));
+  s.recipes = [13, 9];
+  const sc = H.score(s);
+  assert.strictEqual(sc.bonus, 3);
+  assert.strictEqual(sc.total, 15 * 2 + 3); // Liqueur au citron (x2) + bonus Panier de fruits
+});
+
+test('progression des recettes : texte lisible et résultat définitif', () => {
+  const s = blank();
+  s.placed = [{ id: 1 }];
+  put(s, 0, 0, tree('orange'), { t: 'orange', v: 3 });
+  put(s, 1, 0, tree('orange'), { t: 'orange', v: 6 });
+  const p1 = H.recipeProgress(s, H.RECIPE_BY_ID[11]); // Jus d'orange
+  assert.strictEqual(p1.text, '2/5 dés orange en jeu');
+  assert.strictEqual(p1.final, false);
+  const p2 = H.recipeProgress(s, H.RECIPE_BY_ID[15]); // Citron vert confit, avant le 1er coup
+  assert.ok(/1re carte/.test(p2.text) && !p2.final);
+  s.placed.push({ id: 2 });
+  s.firstTurnDice = ['orange'];
+  const p3 = H.recipeProgress(s, H.RECIPE_BY_ID[15]);
+  assert.ok(p3.final && /pas de dé vert/.test(p3.text));
+  assert.ok(H.recipeProgress(s, H.RECIPE_BY_ID[4]).text.startsWith('fait')); // Confiture d'oranges réussie
+  s.over = true;
+  assert.ok(H.recipeProgress(s, H.RECIPE_BY_ID[11]).final);
+});
