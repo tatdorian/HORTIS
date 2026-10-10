@@ -212,8 +212,8 @@ test('versions identiques : index.html (?v=), sw.js et app.js', () => {
   const app = fs.readFileSync(path.join(pub, 'app.js'), 'utf8');
   const appV = /APP_VERSION = '([^']+)'/.exec(app)[1];
   const swV = /const VERSION = '([^']+)'/.exec(sw)[1];
-  const htmlV = [...html.matchAll(/(?:style\.css|core\.js|sound\.js|online\.js|app\.js|install\.js)\?v=([\w.]+)/g)].map((m) => m[1]);
-  assert.strictEqual(htmlV.length, 6);
+  const htmlV = [...html.matchAll(/(?:style\.css|core\.js|achievements\.js|sound\.js|online\.js|app\.js|install\.js)\?v=([\w.]+)/g)].map((m) => m[1]);
+  assert.strictEqual(htmlV.length, 7);
   for (const v of htmlV) assert.strictEqual(v, appV);
   assert.strictEqual(swV, appV);
 });

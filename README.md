@@ -23,7 +23,7 @@ Ortie est une application web installable (PWA). Le bouton **Télécharger**, en
 
 Une fois installée, Ortie s'ouvre en plein écran depuis l'écran d'accueil ou le menu Démarrer, et fonctionne **hors connexion** grâce au service worker (`public/sw.js`).
 
-**Mises à jour fiables.** Les fichiers du jeu sont chargés avec leur numéro de version (`style.css?v=1.19`, `app.js?v=1.19`…). Une nouvelle page ne peut donc jamais utiliser un ancien style ou un ancien code resté en cache, que ce soit sur le téléphone, dans l'appli installée ou chez l'hébergeur. **À chaque nouvelle version, changer le numéro à trois endroits** : `APP_VERSION` dans `app.js`, `VERSION` dans `sw.js` et les `?v=` de `index.html` (six fichiers, dont `sound.js` et `online.js`). Un test (`npm test`) vérifie qu'ils sont identiques. Le serveur revalide les fichiers par empreinte de contenu (ETag), pas par date. Si le jeu ne démarre pas, l'appli vide son cache et se recharge toute seule, une seule fois. L'option « Vider le cache et recharger » existe aussi dans le menu Ortie → Paramètres. L'installation exige que le site soit servi en **https** (c'est le cas sur Railway, Coolify, etc.).
+**Mises à jour fiables.** Les fichiers du jeu sont chargés avec leur numéro de version (`style.css?v=1.20`, `app.js?v=1.20`…). Une nouvelle page ne peut donc jamais utiliser un ancien style ou un ancien code resté en cache, que ce soit sur le téléphone, dans l'appli installée ou chez l'hébergeur. **À chaque nouvelle version, changer le numéro à trois endroits** : `APP_VERSION` dans `app.js`, `VERSION` dans `sw.js` et les `?v=` de `index.html` (sept fichiers, dont `sound.js`, `online.js` et `achievements.js`). Un test (`npm test`) vérifie qu'ils sont identiques. Le serveur revalide les fichiers par empreinte de contenu (ETag), pas par date. Si le jeu ne démarre pas, l'appli vide son cache et se recharge toute seule, une seule fois. L'option « Vider le cache et recharger » existe aussi dans le menu Ortie → Paramètres. L'installation exige que le site soit servi en **https** (c'est le cas sur Railway, Coolify, etc.).
 
 ## Déploiement avec Nixpacks
 
@@ -53,7 +53,7 @@ docker run -p 3000:3000 -e PORT=3000 ortie
 
 ## Menu (logo en haut à gauche)
 
-Le menu est rangé en quatre sections séparées : **Jouer** (partie solo, à deux, à distance), **Apparence** (Personnaliser), **Réglages** (Paramètres) et **Aide** (règles, installation).
+Le menu est rangé en sections séparées : **Jouer** (partie solo, à deux, à distance), **Achievements**, **Apparence** (Personnaliser), **Réglages** (Paramètres) et **Aide** (règles, installation).
 
 - **Partie solo** et **Jouer à deux** : à deux, sur le même appareil, les joueurs reçoivent les mêmes 9 cartes et construisent chacun leur verger à tour de rôle (un écran « À … de jouer » invite à se passer l'appareil). Le meilleur score gagne, puis le plus de dés en jeu en cas d'égalité, comme dans la règle multijoueur du jeu. À la fin, la pastille du joueur en haut du plateau permet de regarder chaque verger.
 - **Jouer à distance** : chacun joue sur son propre téléphone.
@@ -62,6 +62,10 @@ Le menu est rangé en quatre sections séparées : **Jouer** (partie solo, à de
   - Mêmes 9 cartes pour les deux, chacun pose ses cartes **à son rythme**, sans attendre l'autre. En haut du plateau, la pastille de l'adversaire montre en direct sa carte, son score et s'il est en ligne (point vert).
   - Une fois son verger terminé, on peut toucher la pastille pour suivre le verger de l'autre en direct. Quand les deux ont fini, le résultat s'affiche chez les deux joueurs ; « Revanche » relance une manche avec de nouvelles cartes, « Rejouer ces cartes » avec les mêmes.
   - On peut fermer l'appli ou recharger la page : la partie reprend où elle en était. « Annuler » fonctionne pour ses propres coups. Le serveur vérifie chaque coup avec le moteur de règles. Une nouvelle partie solo ou à deux quitte la partie à distance (l'adversaire le voit).
+- **Achievements** : 41 défis à réussir, en bronze, argent, or et un platine (« Maître d'Ortie », tous les autres réunis). Ils sont rangés par thème : premiers pas, belles récoltes, recettes, assiduité, à plusieurs, secrets.
+  - La liste montre les achievements réussis (avec leur date), ceux qui restent à faire (avec une barre de progression pour les compteurs : « 4 / 10 parties »…) et les **secrets**, cachés (« ??? ») tant qu'ils ne sont pas réussis. Filtres : Tous, Réussis, À faire, Secrets. Total de points et statistiques (parties, meilleur score, moyenne, fruits récoltés, recettes, paniers, jours de jeu, parties à deux et à distance).
+  - Dès qu'un achievement est réussi, une **fenêtre surgissante** l'annonce sur l'écran principal, avec un petit son (même par-dessus la fenêtre de fin de partie) ; plusieurs achievements obtenus d'un coup sont annoncés ensemble. Un toucher dessus ouvre la liste. La fin de partie récapitule aussi les nouveaux achievements, et un point doré sur le logo signale ceux qu'on n'a pas encore regardés.
+  - Les compteurs ne comptent qu'une fois par partie, même après « Annuler ». Tout est gardé sur l'appareil (`public/achievements.js`, testé dans `test/achievements.test.js`).
 - **Personnaliser** (boutons « 🎲 Au hasard » pour une combinaison surprise et « ↺ Par défaut ») :
   - **Thème** : automatique (comme le téléphone), clair ou sombre.
   - **Couleurs de l'interface** : Verger, Océan, Prune, Framboise, Cacao (titres, boutons, score ; adaptées au thème sombre).
@@ -81,7 +85,7 @@ Tout le son est synthétisé dans le navigateur (`public/sound.js`, Web Audio) :
 - **Effets** :
   - choisir, tourner et poser une carte (« toc » de bois) ;
   - les dés (la note monte avec la valeur), le Panier et la Brouette (roue et fanfare) ;
-  - l'Écureuil, une pose impossible, l'annulation et le conseil ;
+  - l'Écureuil, une pose impossible, l'annulation, une recette réussie, un achievement ;
   - le changement de joueur, la victoire et la fin de partie.
 - Les navigateurs n'autorisent le son qu'après un premier toucher : la musique démarre au premier geste.
 - **Règles du jeu** et **Installer l'appli**.
@@ -90,7 +94,7 @@ Le jeton **Brouette** prend la couleur du fruit qui l'a remplie (orange, jaune o
 
 ## Aides de jeu
 
-- Choisir une carte ne la pose pas : elle apparaît là où l'on touche ou survole le verger, ou là où on la fait glisser. On la tourne, puis on la pose. Le bouton **Conseil** (💡) reste disponible pour qui veut l'emplacement le plus rentable.
+- Choisir une carte ne la pose pas : elle apparaît là où l'on touche ou survole le verger, ou là où on la fait glisser. On la tourne, puis on la pose.
 - On peut aussi faire glisser une carte de la main directement sur le plateau.
 - Sur téléphone, **deux touchers rapides** sur la carte (sur le plateau ou dans la main) la tournent d'un quart de tour. Un toucher simple ailleurs sur le plateau y déplace la carte.
 - Les gestes au doigt utilisent les évènements tactiles natifs (fiables sur Safari iOS). Le zoom au double toucher, le pincement et le rebond de la page sont bloqués. La barre du bas a une hauteur fixe, pour que le plateau ne change jamais de taille pendant un geste.
@@ -99,7 +103,6 @@ Le jeton **Brouette** prend la couleur du fruit qui l'a remplie (orange, jaune o
 - Le bouton **Télécharger** disparaît quand l'appli est installée. Sur Chrome, Edge et Android, il n'apparaît que si le navigateur propose vraiment l'installation. Sur iPhone et Safari, qui ne permettent pas de le détecter, le bouton « Elle est déjà installée » du guide le masque ; un lien « installer l'appli » reste dans les règles.
 - Sur téléphone, l'écran est fixe comme une application : le plateau ne bouge jamais pendant qu'on déplace une carte. Le score et la réserve s'affichent en haut ; un toucher ouvre le panneau « Détails » (score, recettes, réserve).
 - Chaque case recouverte affiche le dé obtenu, ou une croix rouge si la pose est interdite. Le nombre de fruits gagnés s'affiche sur la carte et sur le bouton **Poser**.
-- **Conseil** (💡) propose le coup qui rapporte le plus de fruits ce tour-ci.
 - **Annuler** revient sur le dernier coup. La partie est sauvegardée automatiquement.
 
 ## Points à vérifier

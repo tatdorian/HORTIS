@@ -4,7 +4,7 @@
   const H = window.OrtieCore;
   const S = 100; // taille d'une case en unités SVG
   const CW = H.CARD_W * S, CH = H.CARD_H * S;
-  const APP_VERSION = '1.19';
+  const APP_VERSION = '1.20';
   const STORE_KEY = 'ortie.save.v3';
   const OLD_STORE_KEY = 'ortie.save.v2';
   const SEEN_KEY = 'ortie.seenRules';
@@ -81,7 +81,7 @@
     hint: $('hint'), toast: $('toast'),
     btnUndo: $('btn-undo'), btnNew: $('btn-new'), btnPlace: $('btn-place'),
     placeLabel: $('place-label'), placeGain: $('place-gain'),
-    btnRotL: $('btn-rot-l'), btnRotR: $('btn-rot-r'), btnHint: $('btn-hint'),
+    btnRotL: $('btn-rot-l'), btnRotR: $('btn-rot-r'),
     dlgNew: $('dlg-new'), dlgEnd: $('dlg-end'), dlgRules: $('dlg-rules'), dlgSquirrel: $('dlg-squirrel'),
     inSeed: $('in-seed'), inRecipes: $('in-recipes'), inR1: $('in-r1'), inR2: $('in-r2'), recipePick: $('recipe-pick'),
     endTitle: $('end-title'), endBody: $('end-body'), legend: $('legend'), defs: $('defs'),
@@ -90,6 +90,8 @@
     dlgTurn: $('dlg-turn'), turnBody: $('turn-body'),
     inModeSolo: $('in-mode-solo'), inModeDuo: $('in-mode-duo'), duoNames: $('duo-names'), inP1: $('in-p1'), inP2: $('in-p2'),
     players: $('players'), playersList: $('players-list'), playerPill: $('player-pill'), whoChip: $('who-chip'), whoMini: $('who-mini'),
+    dlgAch: $('dlg-ach'), achSummary: $('ach-summary'), achList: $('ach-list'), achStats: $('ach-stats'), achToast: $('ach-toast'),
+    menuAchSub: $('menu-ach-sub'), menuAchNew: $('menu-ach-new'),
     dlgOnline: $('dlg-online'), onlineForm: $('online-form'), onlineWait: $('online-wait'), onlineCreate: $('online-create'), onlineJoin: $('online-join'),
     inOCreate: $('in-o-create'), inOJoin: $('in-o-join'), inOName: $('in-oname'), inORecipes: $('in-orecipes'), inOCode: $('in-ocode'),
     btnEndNext: $('btn-end-next'), onlineError: $('online-error'), onlineCode: $('online-code'), btnOnlineGo: $('btn-online-go'), btnOnlineShare: $('btn-online-share'),
@@ -439,7 +441,6 @@
   function updateControls(ev) {
     const sel = ui.sel != null && !state.over;
     els.btnRotL.disabled = els.btnRotR.disabled = !sel;
-    els.btnHint.disabled = state.over;
     els.btnPlace.disabled = !(ev && ev.ok);
     els.btnPlace.classList.toggle('warn', !!(ev && ev.ok && ev.usesSquirrel));
     els.placeLabel.textContent = ev && ev.ok && ev.usesSquirrel ? 'Poser avec l’Écureuil' : 'Poser';
@@ -932,6 +933,7 @@
   function openDialog(d) {
     d.returnValue = ''; // sinon Échap rejouerait le dernier choix (ex. « Planter le verger »)
     if (!d.open) d.showModal();
+    achRaise(); // l'annonce d'un achievement reste au premier plan
   }
 
   const recipesDone = (s) => (s.recipes ? H.score(s).recipes.filter((x) => x.done && !x.mult).map((x) => x.id) : []);
@@ -942,6 +944,7 @@
     const doneBefore = recipesDone(state);
     const res = H.play(state, ui.sel, ui.rot, ui.pos.x, ui.pos.y, { allowSquirrel: withSquirrel });
     if (!res.ok) { toast(res.reason, 'bad'); return; }
+    achSaved(A.onMove(ach, { state, res, now: Date.now() }));
     history.push(before);
     if (history.length > 30) history.shift();
     const evs = res.changes.map((c) => c.event);
@@ -1021,6 +1024,7 @@
       if (allOver()) { toast('La partie est terminée.'); return; }
       clearTimeout(ui.turnTimer);
       match.cur = match.me;
+      match.undos = (match.undos || 0) + 1;
       myPlayer().state = JSON.parse(history.pop());
       syncState();
       ui.locked = false;
@@ -1035,7 +1039,8 @@
     }
     clearTimeout(ui.turnTimer);
     if (els.dlgTurn.open) { ui.skipTurnClose = true; els.dlgTurn.close(); }
-    match = JSON.parse(history.pop());
+    const keep = { undos: (match.undos || 0) + 1, achDone: match.achDone };
+    match = Object.assign(JSON.parse(history.pop()), keep);
     syncState();
     ui.locked = false;
     ui.sel = null; ui.pos = null; ui.endShown = false;
@@ -1063,7 +1068,8 @@
     if (ui.endShown) return;
     ui.endShown = true;
     els.btnEndNext.textContent = isOnline() ? 'Revanche' : 'Nouvelle partie';
-    if (isMulti()) { showDuoEnd(); return; }
+    const won = achGameEnd();
+    if (isMulti()) { showDuoEnd(won); return; }
     const sc = H.score(state);
     sfx(state.endReason === 'blocked' || sc.won === false ? 'end' : 'win', { duck: 3 });
     els.endTitle.textContent = state.endReason === 'blocked' ? 'Le verger est bloqué !' : 'Récolte terminée !';
@@ -1084,13 +1090,14 @@
     b += `<tr class="tot"><td>Total</td><td>${sc.total}</td></tr></table>`;
     if (sc.target != null) b += `<p class="verdict ${sc.won ? 'win' : 'lose'}">${sc.won ? `Objectif de ${sc.target} atteint : victoire !` : `Objectif de ${sc.target} manqué de ${sc.target - sc.total}.`}</p>`;
     b += `<p class="small-note">Partie n° <b>${state.seed}</b> · ${sc.dice} dé(s) en jeu · cartes ${state.cards.join(', ')}</p>`;
+    b += achEndHtml(won);
     b += '<button type="button" id="btn-share" class="btn ghost share">Copier le défi pour un ami</button>';
     els.endBody.innerHTML = b;
     $('btn-share').addEventListener('click', () => share(sc));
     openDialog(els.dlgEnd);
   }
 
-  function showDuoEnd() {
+  function showDuoEnd(won) {
     const rows = match.players.map((p, i) => ({ p, i, sc: H.score(p.state) }));
     const [a, b] = rows;
     let win = null, byDice = false;
@@ -1114,6 +1121,7 @@
     h += '</div>';
     if (byDice) h += '<p class="small-note">Égalité de fruits : la victoire va à celui qui a le plus de dés en jeu.</p>';
     h += `<p class="small-note">Partie n° <b>${esc(state.seed)}</b> · mêmes cartes pour les deux joueurs. Touchez le nom d’un joueur (en haut du verger) pour voir son verger.${isOnline() ? ' « Revanche » : nouvelles cartes, même adversaire.' : ''}</p>`;
+    h += achEndHtml(won);
     els.endBody.innerHTML = h;
     openDialog(els.dlgEnd);
   }
@@ -1346,7 +1354,6 @@
   els.btnRotL.addEventListener('click', () => rotate(-1));
   els.btnRotR.addEventListener('click', () => rotate(1));
   els.btnPlace.addEventListener('click', tryPlace);
-  els.btnHint.addEventListener('click', suggest);
   els.btnUndo.addEventListener('click', undo);
 
   function openNew(mode) {
@@ -1387,6 +1394,181 @@
     if (v === 'again') start(state.seed, state.recipes ? state.recipes.slice() : false, match.mode, names);
     else if (v === 'next') start(null, state.recipes ? true : false, match.mode, names);
   });
+
+  // ---------------------------------------------------------------- Succès
+  // Logique dans achievements.js ; ici : sauvegarde, bandeau, liste.
+  const A = window.OrtieAchievements;
+  const ACH_KEY = 'ortie.achievements';
+  let ach = A.newData();
+  try { ach = A.normalize(JSON.parse(localStorage.getItem(ACH_KEY) || 'null')); } catch (e) { /* ignore */ }
+  const fmt = (n) => Number(n).toLocaleString('fr-FR');
+
+  // Enregistre et annonce les succès qui viennent d'être débloqués.
+  function achSaved(ids) {
+    try { localStorage.setItem(ACH_KEY, JSON.stringify(ach)); } catch (e) { /* stockage indisponible */ }
+    if (ids && ids.length) { achNotify(ids); achBadge(); }
+  }
+
+  function achGameEnd() {
+    const first = !match.achDone;
+    match.achDone = true;
+    let result = null;
+    if (isMulti()) {
+      const [a, b] = match.players.map((p) => H.score(p.state));
+      const tie = a.total === b.total && a.dice === b.dice;
+      if (isOnline() && oppPlayer().left && !oppPlayer().state.over) result = 'win';
+      else if (tie) result = 'tie';
+      else if (isOnline()) {
+        const [mine, other] = match.me === 0 ? [a, b] : [b, a];
+        result = mine.total > other.total || (mine.total === other.total && mine.dice > other.dice) ? 'win' : 'lose';
+      }
+    }
+    const d = new Date();
+    const day = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    const ids = A.onGameEnd(ach, {
+      mode: isOnline() ? 'online' : isDuo() ? 'duo' : 'solo',
+      states: isOnline() ? [myPlayer().state] : match.players.map((p) => p.state),
+      result, undos: match.undos || 0, first, now: d.getTime(), hour: d.getHours(), day,
+    });
+    save();
+    achSaved(ids);
+    return ids;
+  }
+
+  function achIcon(a, locked) {
+    if (locked && a.secret) return '<span class="ach-ico">❓</span>';
+    if (a.icon === 'svg:basket') return '<svg viewBox="-19 -21 38 38" class="ach-svg" aria-hidden="true"><use href="#basket"/></svg>';
+    if (a.icon === 'svg:barrow') return `<svg viewBox="0 0 64 64" class="ach-svg" aria-hidden="true">${barrowArt(null)}</svg>`;
+    if (a.icon === 'svg:squirrel') return '<svg viewBox="0 0 64 64" class="ach-svg" aria-hidden="true"><use href="#squirrel"/></svg>';
+    return `<span class="ach-ico">${a.icon}</span>`;
+  }
+
+  function achEndHtml(ids) {
+    if (!ids || !ids.length) return '';
+    return `<div class="ach-end"><h3>🏆 ${ids.length > 1 ? 'Nouveaux achievements' : 'Nouvel achievement'}</h3>` + ids.map((id) => {
+      const a = A.BY_ID[id];
+      return `<div class="ach-chip tier-${a.tier}"><span class="ach-medal">${achIcon(a)}</span><span><b>${a.name}</b><small>${a.desc}</small></span></div>`;
+    }).join('') + '</div>';
+  }
+
+  // Fenêtre surgissante « Achievement débloqué » sur l'écran principal. Elle
+  // est dans la couche supérieure (popover) : visible même par-dessus une
+  // fenêtre ouverte. Plusieurs achievements obtenus d'un coup sont annoncés
+  // ensemble. Un toucher ouvre la liste.
+  const achQueue = [];
+  let achShowing = false;
+  let achTimer = 0;
+  const TIER_ORDER = ['platine', 'or', 'argent', 'bronze'];
+  const popOpen = (el) => { try { return el.matches(':popover-open'); } catch (e) { return false; } };
+  function achNotify(ids) {
+    achQueue.push(ids.slice());
+    if (!achShowing) achNext();
+  }
+  // Une fenêtre vient de s'ouvrir par-dessus : on remet l'annonce au premier plan.
+  function achRaise() {
+    const el = els.achToast;
+    if (!achShowing || !popOpen(el)) return;
+    try { el.hidePopover(); el.showPopover(); } catch (e) { /* ignore */ }
+  }
+  function achHide() {
+    const el = els.achToast;
+    achShowing = false;
+    el.classList.remove('show');
+    try { if (popOpen(el)) el.hidePopover(); } catch (e) { /* ignore */ }
+  }
+  function achNext() {
+    clearTimeout(achTimer);
+    const el = els.achToast;
+    const batch = achQueue.shift();
+    if (!batch) { achHide(); return; }
+    achShowing = true;
+    const list = batch.map((id) => A.BY_ID[id]).filter(Boolean);
+    const best = list.slice().sort((a, b) => TIER_ORDER.indexOf(a.tier) - TIER_ORDER.indexOf(b.tier))[0];
+    el.className = 'ach-toast tier-' + best.tier + (list.length > 1 ? ' multi' : '');
+    if (list.length === 1) {
+      el.innerHTML = `<span class="ach-medal">${achIcon(best)}</span><span class="at-txt"><small>🏆 Achievement débloqué ! · ${A.TIERS[best.tier].name}</small><b>${best.name}</b><span class="at-desc">${best.desc}</span></span>`;
+    } else {
+      const more = list.length - 3;
+      const names = list.slice(0, 3).map((a) => a.name).join(', ') + (more > 0 ? ` et ${more} autre${more > 1 ? 's' : ''}` : '');
+      el.innerHTML = `<span class="at-txt"><small>🏆 ${list.length} achievements débloqués !</small><span class="at-medals">${list.slice(0, 7).map((a) => `<span class="ach-medal tier-${a.tier}">${achIcon(a)}</span>`).join('')}</span><span class="at-desc">${names}</span></span>`;
+    }
+    el.setAttribute('aria-label', list.length === 1 ? 'Achievement débloqué : ' + best.name : list.length + ' achievements débloqués');
+    try { if (el.showPopover && !popOpen(el)) el.showPopover(); } catch (e) { /* navigateur sans popover */ }
+    requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('show')));
+    sfx('achievement');
+    achTimer = setTimeout(() => { el.classList.remove('show'); achTimer = setTimeout(achNext, 380); }, list.length > 1 ? 4800 : 3800);
+  }
+  els.achToast.addEventListener('click', () => {
+    clearTimeout(achTimer);
+    achQueue.length = 0;
+    achHide();
+    openAch();
+  });
+
+  function achBadge() {
+    const s = A.summary(ach);
+    els.menuAchSub.textContent = `${s.count} / ${s.total} réussis · ${fmt(s.pts)} points`;
+    els.menuAchNew.hidden = !s.fresh;
+    els.menuAchNew.textContent = s.fresh + (s.fresh > 1 ? ' nouveaux' : ' nouveau');
+    const badge = document.querySelector('.menu-badge');
+    if (badge) badge.classList.toggle('has-new', s.fresh > 0);
+  }
+
+  let achSeen = 0; // « nouveau » : débloqué depuis la dernière visite de la liste
+  function renderAch() {
+    const s = A.summary(ach);
+    const f = (els.dlgAch.querySelector('input[name=achf]:checked') || {}).value || 'all';
+    const pct = Math.round((100 * s.count) / s.total);
+    els.achSummary.innerHTML = `<div class="as-top"><div class="as-main"><b>${s.count}</b><span>/ ${s.total} réussis</span></div><div class="as-pts"><b>${fmt(s.pts)}</b> / ${fmt(s.max)} points</div></div>`
+      + `<div class="bar"><span style="width:${pct}%"></span></div>`
+      + `<div class="as-tiers">${Object.entries(A.TIERS).map(([t, T]) => `<span class="tier-${t}"><i></i>${s.tiers[t]} ${T.name.toLowerCase()}</span>`).join('')}</div>`;
+    let h = '';
+    for (const [cat, title] of A.CATEGORIES) {
+      const inCat = A.LIST.filter((a) => a.cat === cat);
+      const items = inCat.filter((a) => (f === 'all' ? true : f === 'secret' ? a.secret : (f === 'done') === !!ach.unlocked[a.id]));
+      if (!items.length) continue;
+      h += `<h4 class="ach-cat">${title}<span>${inCat.filter((a) => ach.unlocked[a.id]).length} / ${inCat.length}</span></h4><div class="ach-grid">`;
+      for (const a of items) {
+        const t = ach.unlocked[a.id];
+        const hidden = a.secret && !t;
+        const p = A.progress(ach, a);
+        let foot = '';
+        if (t) foot = `<em class="ach-date">Débloqué le ${new Date(t).toLocaleDateString('fr-FR')}</em>`;
+        else if (p) foot = `<span class="ach-prog"><i style="width:${Math.round((100 * p.cur) / p.goal)}%"></i></span><em>${fmt(p.cur)} / ${fmt(p.goal)}</em>`;
+        h += `<div class="ach-card tier-${a.tier}${t ? ' done' : ''}${t && t > achSeen ? ' new' : ''}">`
+          + `<span class="ach-medal">${achIcon(a, !t)}</span>`
+          + `<div class="ach-txt"><b>${hidden ? 'Achievement secret' : a.name}</b><small>${hidden ? 'Continuez à jouer pour le découvrir…' : a.desc}</small>${foot}</div>`
+          + `<span class="ach-tier">${A.TIERS[a.tier].name}</span></div>`;
+      }
+      h += '</div>';
+    }
+    els.achList.innerHTML = h || '<p class="small-note">Aucun achievement ici pour le moment : à vous de jouer !</p>';
+    const st = ach.stats;
+    const rows = [
+      ['Parties terminées', fmt(st.games)],
+      ['Meilleur score', st.best ? st.best + ' fruits' : '—'],
+      ['Moyenne par verger', st.orchards ? Math.round(st.fruits / st.orchards) + ' fruits' : '—'],
+      ['Fruits récoltés', fmt(st.fruits)],
+      ['Recettes réussies', fmt(st.recipes)],
+      ['Recettes différentes', st.recipeSet.length + ' / ' + A.BONUS_RECIPES.length],
+      ['Paniers en fin de partie', fmt(st.baskets)],
+      ['Jours de jeu', fmt(st.days)],
+      ['Parties à deux', fmt(st.duoGames)],
+      ['Parties à distance', fmt(st.onlineGames)],
+      ['Victoires à distance', fmt(st.onlineWins)],
+    ];
+    els.achStats.innerHTML = rows.map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('');
+  }
+  function openAch() {
+    achSeen = ach.seenAt;
+    renderAch();
+    openDialog(els.dlgAch);
+    els.dlgAch.scrollTop = 0;
+    ach.seenAt = Date.now();
+    achSaved();
+    achBadge();
+  }
+  for (const r of els.dlgAch.querySelectorAll('input[name=achf]')) r.addEventListener('change', renderAch);
 
   // ------------------------------------------------------- Jouer à distance
   // Chacun joue sur son appareil, en même temps, avec les mêmes cartes. Le
@@ -1520,6 +1702,7 @@
     computeView();
     save();
     renderAll();
+    if (snap.round > 1) achSaved(A.onEvent(ach, 'revanche'));
     // Écran d'accueil de la manche
     const op = oppPlayer();
     let h = `<div class="turn-head"><span class="big-dot" style="background:${myPlayer().color}"></span><div><h2>${snap.round > 1 ? 'Revanche' : 'Partie'} contre ${esc(op.name)} !</h2>`;
@@ -1679,12 +1862,13 @@
   });
 
   // Menu (logo en haut à gauche)
-  els.btnMenu.addEventListener('click', () => { sfx('ui'); openDialog(els.dlgMenu); });
+  els.btnMenu.addEventListener('click', () => { sfx('ui'); achBadge(); openDialog(els.dlgMenu); });
   els.dlgMenu.addEventListener('close', () => {
     const v = els.dlgMenu.returnValue;
     if (v === 'solo') openNew('solo');
     else if (v === 'duo') openNew('duo');
     else if (v === 'online') openOnline('create');
+    else if (v === 'ach') openAch();
     else if (v === 'custom') openCustom();
     else if (v === 'settings') openSettings();
     else if (v === 'rules') openDialog(els.dlgRules);
@@ -1717,7 +1901,10 @@
       `<button type="button" class="opt${prefs.dice === id ? ' on' : ''}" data-dice-opt="${id}" aria-pressed="${prefs.dice === id}"><svg viewBox="-92 -34 184 70" aria-hidden="true">${dice(id)}</svg><span class="opt-name">${name}</span></button>`).join('');
   }
   function customChanged() {
-    savePrefs(); applyPrefs(); renderCustom(); renderAll(); renderLegend();
+    savePrefs(); applyPrefs(); renderCustom(); renderAll(); renderLegend(); achStyle();
+  }
+  function achStyle() {
+    if (prefs.board !== 'oak' && prefs.cards !== 'classic' && prefs.dice !== 'classic' && prefs.accent !== 'verger') achSaved(A.onEvent(ach, 'styliste'));
   }
   function openCustom() { renderCustom(); openDialog(els.dlgCustom); }
   function openSettings() { renderSound(); openDialog(els.dlgSettings); }
@@ -1766,13 +1953,13 @@
     const b = e.target.closest('[data-board-opt]');
     if (!b) return;
     prefs.board = b.dataset.boardOpt;
-    savePrefs(); applyPrefs(); renderCustom();
+    savePrefs(); applyPrefs(); renderCustom(); achStyle();
   });
   els.optCards.addEventListener('click', (e) => {
     const b = e.target.closest('[data-card-opt]');
     if (!b) return;
     prefs.cards = b.dataset.cardOpt;
-    savePrefs(); renderCustom(); renderAll(); renderLegend();
+    savePrefs(); renderCustom(); renderAll(); renderLegend(); achStyle();
   });
   els.optAccents.addEventListener('click', (e) => {
     const b = e.target.closest('[data-accent-opt]');
@@ -1817,7 +2004,6 @@
     if (k === '1' || k === '2') { const id = state.hand[Number(k) - 1]; if (id) selectCard(id); }
     else if (k === 'r' || k === 'e') rotate(1);
     else if (k === 'q') rotate(-1);
-    else if (k === 'h') suggest();
     else if (k === 'enter') { if (ui.sel != null) { e.preventDefault(); tryPlace(); } }
     else if (k === 'escape') {
       if (!els.recipePop.hidden) { closeRecipePop(); return; }
@@ -1850,6 +2036,8 @@
     renderAll();
     if (allOver()) ui.endShown = true;
     if (isOnline()) netOpen(match.code, match.token); // on retrouve la partie à distance
+    // partie finie juste avant une fermeture de l'appli : succès comptés quand même
+    if ((isOnline() ? onlineFinished() : allOver()) && !match.achDone) achGameEnd();
   } else {
     start(null, false);
   }
@@ -1858,6 +2046,10 @@
     try { window.history.replaceState(null, '', location.pathname); } catch (e) { /* ignore */ }
     if (!(isOnline() && match.code === invite)) openOnline('join', invite);
   }
+  achBadge();
+  achStyle();
+  // Outils de test (jamais visibles pour le joueur) : localStorage « ortie.debug » = 1
+  try { if (localStorage.getItem('ortie.debug') === '1') window.OrtieDebug = { suggest, place: tryPlace }; } catch (e) { /* ignore */ }
   // largeurs exactes une fois la police du jeu chargée
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { fitTexts(); layoutOverlays(); });
   window.__ortieReady = true; // le jeu a démarré (voir le garde-fou dans index.html)

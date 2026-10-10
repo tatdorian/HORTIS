@@ -4,7 +4,7 @@
  *   OrtieSound.configure({ music, sfx, musicVol, sfxVol })   // réglages (0..1)
  *   OrtieSound.play('place' | 'select' | 'rotate' | 'bad' | 'undo' | 'hint'
  *                   | 'basket' | 'barrow' | 'squirrel' | 'turn' | 'start'
- *                   | 'recipe' | 'win' | 'end' | 'ui' | 'test')
+ *                   | 'recipe' | 'achievement' | 'win' | 'end' | 'ui' | 'test')
  *   OrtieSound.dice([valeurs])   // un petit son par dé posé ou augmenté
  *
  * Les navigateurs n'autorisent le son qu'après un premier geste du joueur :
@@ -178,6 +178,11 @@
       case 'recipe': // recette réussie : petite cloche montante
         [76, 79, 84].forEach((m, i) => pluck(mtof(m), t + i * 0.08, 0.11, 0.4, B));
         bell(mtof(88), t + 0.26, 0.07, 1.1, B);
+        break;
+      case 'achievement': // succès débloqué : petite fanfare de clochettes
+        [72, 79, 84, 88].forEach((m, i) => bell(mtof(m), t + i * 0.09, 0.08, 0.9, B));
+        [76, 84].forEach((m) => pluck(mtof(m), t + 0.42, 0.1, 0.8, B));
+        noise(t + 0.4, 0.35, 0.03, B, { type: 'highpass', freq: 7500 });
         break;
       case 'squirrel': // petits cris d'écureuil
         [0, 0.1, 0.2].forEach((d) => osc('sine', 1700, t + d, 0.07, 0.07, 0.004, B, { to: 3400, glide: 0.05 }));
