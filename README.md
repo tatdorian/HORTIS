@@ -23,7 +23,7 @@ Ortie est une application web installable (PWA). Le bouton **Télécharger**, en
 
 Une fois installée, Ortie s'ouvre en plein écran depuis l'écran d'accueil ou le menu Démarrer, et fonctionne **hors connexion** grâce au service worker (`public/sw.js`).
 
-**Mises à jour fiables.** Les fichiers du jeu sont chargés avec leur numéro de version (`style.css?v=1.12`, `app.js?v=1.12`…). Une nouvelle page ne peut donc jamais utiliser un ancien style ou un ancien code resté en cache, que ce soit sur le téléphone, dans l'appli installée ou chez l'hébergeur. **À chaque nouvelle version, changer le numéro à trois endroits** : `APP_VERSION` dans `app.js`, `VERSION` dans `sw.js` et les `?v=` de `index.html` (cinq fichiers, dont `sound.js`). Un test (`npm test`) vérifie qu'ils sont identiques. Le serveur revalide les fichiers par empreinte de contenu (ETag), pas par date. Si le jeu ne démarre pas, l'appli vide son cache et se recharge toute seule, une seule fois. L'option « Vider le cache et recharger » existe aussi dans le menu Ortie → Paramètres. L'installation exige que le site soit servi en **https** (c'est le cas sur Railway, Coolify, etc.).
+**Mises à jour fiables.** Les fichiers du jeu sont chargés avec leur numéro de version (`style.css?v=1.13`, `app.js?v=1.13`…). Une nouvelle page ne peut donc jamais utiliser un ancien style ou un ancien code resté en cache, que ce soit sur le téléphone, dans l'appli installée ou chez l'hébergeur. **À chaque nouvelle version, changer le numéro à trois endroits** : `APP_VERSION` dans `app.js`, `VERSION` dans `sw.js` et les `?v=` de `index.html` (cinq fichiers, dont `sound.js`). Un test (`npm test`) vérifie qu'ils sont identiques. Le serveur revalide les fichiers par empreinte de contenu (ETag), pas par date. Si le jeu ne démarre pas, l'appli vide son cache et se recharge toute seule, une seule fois. L'option « Vider le cache et recharger » existe aussi dans le menu Ortie → Paramètres. L'installation exige que le site soit servi en **https** (c'est le cas sur Railway, Coolify, etc.).
 
 ## Déploiement avec Nixpacks
 
@@ -47,6 +47,8 @@ docker run -p 3000:3000 -e PORT=3000 ortie
 - **Mode compétitif** : le même numéro de partie donne les mêmes cartes, dans le même ordre (lien partageable `?partie=1234&recettes=7,5`).
 
 ## Menu (logo en haut à gauche)
+
+Le menu est rangé en quatre sections séparées : **Jouer** (partie solo, à deux), **Apparence** (Personnaliser), **Réglages** (Paramètres) et **Aide** (règles, installation).
 
 - **Partie solo** et **Jouer à deux** : à deux, sur le même appareil, les joueurs reçoivent les mêmes 9 cartes et construisent chacun leur verger à tour de rôle (un écran « À … de jouer » invite à se passer l'appareil). Le meilleur score gagne, puis le plus de dés en jeu en cas d'égalité, comme dans la règle multijoueur du jeu. À la fin, la pastille du joueur en haut du plateau permet de regarder chaque verger.
 - **Personnaliser** :

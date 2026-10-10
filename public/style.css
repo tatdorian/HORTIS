@@ -564,7 +564,10 @@ kbd { background: var(--surface-2); border: 1px solid var(--line); border-bottom
 .menu-head h2 { margin: 0; }
 .menu-head .version { display: block; }
 .menu-logo { width: 52px; height: 52px; flex: none; }
-.menu-list { display: grid; gap: 8px; }
+.menu-list { display: grid; gap: 14px; }
+.menu-sec { display: grid; gap: 8px; }
+.menu-sec + .menu-sec { padding-top: 12px; border-top: 1px solid var(--line); }
+.menu-sec-title { margin: 0; font: 800 11.5px 'Nunito', sans-serif; letter-spacing: .8px; text-transform: uppercase; color: var(--muted); }
 .menu-item {
   display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; border: 1px solid var(--line); background: var(--surface-2);
   border-radius: 16px; padding: 12px 14px; cursor: pointer; color: var(--ink); text-decoration: none; font: inherit; transition: transform .1s, border-color .15s;
@@ -626,3 +629,5 @@ kbd { background: var(--surface-2); border: 1px solid var(--line); border-bottom
 .theme-swatch[data-t="dark"] i:nth-child(2) { background: #8a6743; }
 .theme-swatch[data-t="auto"] { background: linear-gradient(135deg, #f4ecd8 50%, #171b14 50%); }
 .theme-swatch[data-t="auto"] i:nth-child(3) { background: #222a1e; }
+.dlg .menu-sec-title { margin: 0; font: 800 12px 'Nunito', sans-serif; letter-spacing: .8px; text-transform: uppercase; color: var(--brand); }
+.menu .menu-item { padding: 10px 14px; }
