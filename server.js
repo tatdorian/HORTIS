@@ -1,9 +1,10 @@
-// Serveur statique minimal pour Ortie (aucune dépendance).
+// Serveur minimal pour Ortie (aucune dépendance) : fichiers du jeu + parties à distance.
 'use strict';
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const rooms = require('./rooms'); // parties à distance (/api/…)
 
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -20,6 +21,7 @@ const TYPES = {
 };
 
 const server = http.createServer((req, res) => {
+  if (req.url.startsWith('/api/') && rooms.handle(req, res)) return;
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     res.writeHead(405, { Allow: 'GET, HEAD' });
     return res.end();

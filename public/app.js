@@ -4,11 +4,12 @@
   const H = window.OrtieCore;
   const S = 100; // taille d'une case en unités SVG
   const CW = H.CARD_W * S, CH = H.CARD_H * S;
-  const APP_VERSION = '1.15';
+  const APP_VERSION = '1.16';
   const STORE_KEY = 'ortie.save.v3';
   const OLD_STORE_KEY = 'ortie.save.v2';
   const SEEN_KEY = 'ortie.seenRules';
   const PREFS_KEY = 'ortie.prefs';
+  const TOKENS_KEY = 'ortie.online.tokens'; // place gardée dans chaque partie à distance
 
   // Design des cartes (prairie + buissons). Les fruits gardent toujours leurs couleurs.
   const CARD_THEMES = {
@@ -26,7 +27,7 @@
   const BOARDS = { oak: 'Chêne clair', walnut: 'Noyer', felt: 'Tapis bleu', linen: 'Lin', slate: 'Ardoise', terracotta: 'Tomettes' };
   const PLAYER_COLORS = ['#f06a32', '#3b7fc4'];
   const THEMES = { auto: 'Automatique', light: 'Clair', dark: 'Sombre' };
-  const prefs = { theme: 'auto', board: 'oak', cards: 'classic', names: ['', ''], sound: { music: true, sfx: true, musicVol: 0.4, sfxVol: 0.7 } };
+  const prefs = { theme: 'auto', board: 'oak', cards: 'classic', names: ['', ''], onlineName: '', sound: { music: true, sfx: true, musicVol: 0.4, sfxVol: 0.7 } };
   try {
     const saved = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
     Object.assign(prefs, saved, { sound: Object.assign({}, prefs.sound, saved.sound || {}) });
@@ -65,6 +66,9 @@
     dlgTurn: $('dlg-turn'), turnBody: $('turn-body'),
     inModeSolo: $('in-mode-solo'), inModeDuo: $('in-mode-duo'), duoNames: $('duo-names'), inP1: $('in-p1'), inP2: $('in-p2'),
     players: $('players'), playersList: $('players-list'), playerPill: $('player-pill'), whoChip: $('who-chip'), whoMini: $('who-mini'),
+    dlgOnline: $('dlg-online'), onlineForm: $('online-form'), onlineWait: $('online-wait'), onlineCreate: $('online-create'), onlineJoin: $('online-join'),
+    inOCreate: $('in-o-create'), inOJoin: $('in-o-join'), inOName: $('in-oname'), inORecipes: $('in-orecipes'), inOCode: $('in-ocode'),
+    btnEndNext: $('btn-end-next'), onlineError: $('online-error'), onlineCode: $('online-code'), btnOnlineGo: $('btn-online-go'), btnOnlineShare: $('btn-online-share'),
   };
 
   // match.players[i].state est un état de partie du moteur ; `state` désigne
@@ -73,6 +77,11 @@
   let state = null;
   let history = [];
   const isDuo = () => !!match && match.mode === 'duo';
+  // À distance : chacun joue sur son appareil ; match.me = ma place (0 ou 1).
+  const isOnline = () => !!match && match.mode === 'online';
+  const isMulti = () => isDuo() || isOnline();
+  const myPlayer = () => match.players[match.me];
+  const oppPlayer = () => match.players[1 - match.me];
   const curPlayer = () => match.players[match.cur];
   function syncState() { state = match.players[match.cur].state; }
   const ui = { locked: false, sel: null, rot: 0, pos: null, anchor: null, spin: null, lastTap: null, lastHandTap: null, drag: null, handDrag: null, dragEndAt: -1e9, fresh: null, popKeys: [], view: null, endShown: false };
@@ -608,36 +617,60 @@
     els.recipeBar.classList.remove('open');
   }
 
+  // Voir le verger de l'autre : à deux, une fois la partie finie ; à distance,
+  // dès que mon verger est terminé (je peux alors suivre l'autre en direct).
+  const canSwitchView = () => (isDuo() ? allOver() : isOnline() ? myPlayer().state.over : false);
+  const cardOf = (st) => Math.min(st.placed.length + (st.over ? 0 : 1), H.GAME_CARDS);
+
   function renderPlayers() {
-    const duo = isDuo();
-    document.body.classList.toggle('duo', duo);
-    els.players.hidden = !duo;
-    els.playerPill.hidden = !duo;
-    els.whoChip.hidden = !duo;
-    els.whoMini.hidden = !duo;
-    if (!duo) return;
+    const multi = isMulti();
+    document.body.classList.toggle('duo', multi);
+    els.players.hidden = !multi;
+    els.playerPill.hidden = !multi;
+    els.whoChip.hidden = !multi;
+    els.whoMini.hidden = !multi;
+    if (!multi) return;
     const vi = viewedIndex();
     const vp = match.players[vi];
     const over = allOver();
+    const sw = canSwitchView();
     els.whoChip.innerHTML = `<i class="who-dot" style="background:${vp.color}"></i>${esc(vp.name)} · `;
     els.whoMini.style.background = vp.color;
-    const n = Math.min(vp.state.placed.length + (vp.state.over ? 0 : 1), H.GAME_CARDS);
-    els.playerPill.innerHTML = `<i class="who-dot" style="background:${vp.color}"></i><b>${esc(vp.name)}</b><span>${over ? 'voir l’autre verger ⇄' : vp.state.over ? 'terminé' : 'carte ' + n + '/' + H.GAME_CARDS}</span>`;
-    els.playerPill.classList.toggle('can-switch', over);
-    els.playerPill.style.setProperty('--pc', vp.color);
+    if (isOnline()) {
+      // La pastille montre toujours l'adversaire : où il en est, en direct.
+      const op = oppPlayer();
+      let st;
+      if (vi !== match.me) st = 'revenir à mon verger ⇄';
+      else if (op.left) st = 'a quitté la partie';
+      else if (!ui.linkOk) st = 'connexion…';
+      else st = (op.state.over ? 'terminé' : 'carte ' + cardOf(op.state) + '/' + H.GAME_CARDS) + ' · ' + H.score(op.state).total + ' fruits' + (sw ? ' · voir ⇄' : '');
+      const live = ui.linkOk && op.online && !op.left;
+      els.playerPill.innerHTML = `<i class="who-dot" style="background:${op.color}"></i><b>${vi !== match.me ? 'Verger de ' : ''}${esc(op.name)}</b><span>${st}</span><i class="net-dot${live ? ' on' : ''}" title="${live ? 'En ligne' : 'Hors ligne'}"></i>`;
+      els.playerPill.style.setProperty('--pc', op.color);
+    } else {
+      els.playerPill.innerHTML = `<i class="who-dot" style="background:${vp.color}"></i><b>${esc(vp.name)}</b><span>${over ? 'voir l’autre verger ⇄' : vp.state.over ? 'terminé' : 'carte ' + cardOf(vp.state) + '/' + H.GAME_CARDS}</span>`;
+      els.playerPill.style.setProperty('--pc', vp.color);
+    }
+    els.playerPill.classList.toggle('can-switch', sw);
     els.playersList.innerHTML = match.players.map((p, i) => {
       const sc = H.score(p.state);
       const cards = Math.min(p.state.placed.length, H.GAME_CARDS);
-      const tag = over ? (i === vi ? 'affiché' : 'voir') : p.state.over ? 'terminé' : i === match.cur ? 'à jouer' : '';
-      return `<button type="button" class="pl${i === vi ? ' on' : ''}" data-player="${i}" ${over ? '' : 'disabled'}><i class="who-dot" style="background:${p.color}"></i><span class="pl-name">${esc(p.name)}</span><span class="pl-tag">${tag}</span><span class="pl-cards">${cards}/${H.GAME_CARDS}</span><b>${sc.total}</b></button>`;
+      let tag;
+      if (sw) tag = i === vi ? 'affiché' : 'voir';
+      else if (p.state.over) tag = 'terminé';
+      else if (isOnline()) tag = i === match.me ? 'vous' : p.left ? 'parti' : p.online ? 'en ligne' : 'hors ligne';
+      else tag = i === match.cur ? 'à jouer' : '';
+      return `<button type="button" class="pl${i === vi ? ' on' : ''}" data-player="${i}" ${sw ? '' : 'disabled'}><i class="who-dot" style="background:${p.color}"></i><span class="pl-name">${esc(nameOf(i))}</span><span class="pl-tag">${tag}</span><span class="pl-cards">${cards}/${H.GAME_CARDS}</span><b>${sc.total}</b></button>`;
     }).join('');
   }
+  const nameOf = (i) => match.players[i].name + (isOnline() && i === match.me ? ' (vous)' : '');
 
-  // Fin de partie à deux : on peut regarder le verger de chaque joueur.
+  // Regarder le verger d'un autre joueur (en lecture seule).
   function viewPlayer(i) {
-    if (!isDuo() || !allOver() || i === viewedIndex()) return;
+    if (!canSwitchView() || i === viewedIndex()) return;
     match.cur = i;
     syncState();
+    ui.locked = isOnline() && i !== match.me;
     ui.sel = null; ui.pos = null;
     computeView();
     save();
@@ -832,7 +865,7 @@
 
   function doPlace(withSquirrel) {
     if (ui.locked) return;
-    const before = JSON.stringify(match);
+    const before = isOnline() ? JSON.stringify(state) : JSON.stringify(match);
     const doneBefore = recipesDone(state);
     const res = H.play(state, ui.sel, ui.rot, ui.pos.x, ui.pos.y, { allowSquirrel: withSquirrel });
     if (!res.ok) { toast(res.reason, 'bad'); return; }
@@ -857,6 +890,15 @@
     ui.fresh = true;
     ui.sel = null; ui.pos = null;
     computeView(true);
+    if (isOnline()) {
+      save();
+      renderAll();
+      pushMoves();
+      clearTimeout(ui.turnTimer);
+      if (onlineFinished()) ui.turnTimer = setTimeout(showEnd, 650);
+      else if (state.over) ui.turnTimer = setTimeout(() => toast(`Verger terminé ! Touchez ${oppPlayer().name} pour le suivre.`), 1500);
+      return;
+    }
     // À deux : on passe la main à l'autre joueur s'il lui reste des cartes.
     let next = match.cur;
     if (isDuo() && !match.players[1 - match.cur].state.over) next = 1 - match.cur;
@@ -887,7 +929,7 @@
     return '<div class="mini-board">' + match.players.map((p, i) => {
       const sc = H.score(p.state);
       const n = Math.min(p.state.placed.length, H.GAME_CARDS);
-      return `<div class="mb-row${i === match.cur && !allOver() ? ' on' : ''}"><i class="who-dot" style="background:${p.color}"></i><span class="mb-name">${esc(p.name)}</span><span class="mb-cards">${n}/${H.GAME_CARDS}</span><b>${sc.total}</b></div>`;
+      return `<div class="mb-row${i === match.cur && !allOver() ? ' on' : ''}"><i class="who-dot" style="background:${p.color}"></i><span class="mb-name">${esc(nameOf(i))}</span><span class="mb-cards">${n}/${H.GAME_CARDS}</span><b>${sc.total}</b></div>`;
     }).join('') + '</div>';
   }
 
@@ -902,6 +944,22 @@
 
   function undo() {
     if (!history.length) return;
+    if (isOnline()) {
+      if (allOver()) { toast('La partie est terminée.'); return; }
+      clearTimeout(ui.turnTimer);
+      match.cur = match.me;
+      myPlayer().state = JSON.parse(history.pop());
+      syncState();
+      ui.locked = false;
+      ui.sel = null; ui.pos = null;
+      computeView();
+      save();
+      renderAll();
+      pushMoves();
+      sfx('undo');
+      toast('Coup annulé.');
+      return;
+    }
     clearTimeout(ui.turnTimer);
     if (els.dlgTurn.open) { ui.skipTurnClose = true; els.dlgTurn.close(); }
     match = JSON.parse(history.pop());
@@ -931,7 +989,8 @@
   function showEnd() {
     if (ui.endShown) return;
     ui.endShown = true;
-    if (isDuo()) { showDuoEnd(); sfx('win', { duck: 3 }); return; }
+    els.btnEndNext.textContent = isOnline() ? 'Revanche' : 'Nouvelle partie';
+    if (isMulti()) { showDuoEnd(); return; }
     const sc = H.score(state);
     sfx(state.endReason === 'blocked' || sc.won === false ? 'end' : 'win', { duck: 3 });
     els.endTitle.textContent = state.endReason === 'blocked' ? 'Le verger est bloqué !' : 'Récolte terminée !';
@@ -964,12 +1023,15 @@
     let win = null, byDice = false;
     if (a.sc.total !== b.sc.total) win = a.sc.total > b.sc.total ? a : b;
     else if (a.sc.dice !== b.sc.dice) { win = a.sc.dice > b.sc.dice ? a : b; byDice = true; }
-    els.endTitle.textContent = win ? `Victoire de ${win.p.name} !` : 'Égalité parfaite !';
+    if (isOnline() && oppPlayer().left && !oppPlayer().state.over) { win = rows[match.me]; els.endTitle.textContent = 'Victoire par forfait !'; }
+    else if (isOnline()) els.endTitle.textContent = !win ? 'Égalité parfaite !' : win.i === match.me ? 'Vous avez gagné !' : `${win.p.name} a gagné !`;
+    else els.endTitle.textContent = win ? `Victoire de ${win.p.name} !` : 'Égalité parfaite !';
+    sfx(isOnline() && win && win.i !== match.me ? 'end' : 'win', { duck: 3 });
     let h = '<div class="duo-end">';
     for (const r of rows) {
       const sc = r.sc;
       h += `<div class="duo-col${win && win.i === r.i ? ' win' : ''}" style="--pc:${r.p.color}">`;
-      h += `<div class="duo-name"><i class="who-dot" style="background:${r.p.color}"></i>${esc(r.p.name)}${win && win.i === r.i ? ' 🏆' : ''}</div>`;
+      h += `<div class="duo-name"><i class="who-dot" style="background:${r.p.color}"></i>${esc(nameOf(r.i))}${win && win.i === r.i ? ' 🏆' : ''}</div>`;
       h += `<div class="duo-score">${sc.total}<small> fruits</small></div>`;
       h += '<div class="duo-detail">' + H.TYPES.map((t) => `<span><i class="dot" style="background:${DIE_FILL[t]}"></i>${sc.scored[t]}</span>`).join('') + '</div>';
       h += `<div class="duo-sub">${sc.dice} dé(s) en jeu${sc.bonus ? ' · bonus +' + sc.bonus : ''}${sc.lost ? ' · ' + sc.lost + ' pourris' : ''}</div>`;
@@ -978,7 +1040,7 @@
     }
     h += '</div>';
     if (byDice) h += '<p class="small-note">Égalité de fruits : la victoire va à celui qui a le plus de dés en jeu.</p>';
-    h += `<p class="small-note">Partie n° <b>${esc(state.seed)}</b> · mêmes cartes pour les deux joueurs. Touchez le nom d’un joueur (en haut du verger) pour voir son verger.</p>`;
+    h += `<p class="small-note">Partie n° <b>${esc(state.seed)}</b> · mêmes cartes pour les deux joueurs. Touchez le nom d’un joueur (en haut du verger) pour voir son verger.${isOnline() ? ' « Revanche » : nouvelles cartes, même adversaire.' : ''}</p>`;
     els.endBody.innerHTML = h;
     openDialog(els.dlgEnd);
   }
@@ -1001,6 +1063,7 @@
   }
 
   function start(seed, recipes, mode, names) {
+    if (isOnline()) onlineQuit();
     mode = mode === 'duo' ? 'duo' : 'solo';
     seed = String(seed || H.randomSeed());
     const mk = () => H.newGame(seed, { recipes });
@@ -1042,6 +1105,8 @@
         history = [];
       }
       if (!(match.cur >= 0 && match.cur < match.players.length)) match.cur = 0;
+      if (match.mode === 'online' && !(match.code && match.token && (match.me === 0 || match.me === 1) && match.players.length === 2)) match.mode = 'duo';
+      if (match.mode === 'online') match.cur = match.me; // on revient toujours sur son propre verger
       syncState();
       return true;
     } catch (e) { return false; }
@@ -1244,14 +1309,295 @@
   els.dlgTurn.addEventListener('close', afterTurnDialog);
   els.dlgEnd.addEventListener('close', () => {
     const v = els.dlgEnd.returnValue;
+    if (isOnline()) { if (v === 'again' || v === 'next') onlineRematch(v === 'again'); return; }
     const names = match.players.map((p) => p.name);
     if (v === 'again') start(state.seed, state.recipes ? state.recipes.slice() : false, match.mode, names);
     else if (v === 'next') start(null, state.recipes ? true : false, match.mode, names);
   });
 
+  // ------------------------------------------------------- Jouer à distance
+  // Chacun joue sur son appareil, en même temps, avec les mêmes cartes. Le
+  // serveur (rooms.js) relaie la liste des coups de chacun ; on reconstruit le
+  // verger de l'autre en rejouant ses coups avec le moteur.
+  const O = window.OrtieOnline;
+  let net = null; // liaison en cours : { code, token, conn, push }
+  let lobby = null; // partie créée ou rejointe, en attente du 2e joueur : { code, token, seat }
+  ui.linkOk = false;
+
+  const movesOf = (st) => st.placed.slice(1).map((m) => ({ id: m.id, rot: m.rot, x: m.x, y: m.y }));
+  const sameMoves = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  function replayState(seed, recipes, moves) {
+    const st = H.newGame(seed, { recipes: recipes || false });
+    for (const m of moves || []) if (!H.play(st, m.id, m.rot, m.x, m.y, { allowSquirrel: true }).ok) break;
+    return st;
+  }
+
+  function loadTokens() { try { return JSON.parse(localStorage.getItem(TOKENS_KEY) || '{}') || {}; } catch (e) { return {}; } }
+  function rememberToken(code, token) {
+    const t = loadTokens();
+    delete t[code];
+    t[code] = token;
+    const keys = Object.keys(t);
+    while (keys.length > 12) delete t[keys.shift()];
+    try { localStorage.setItem(TOKENS_KEY, JSON.stringify(t)); } catch (e) { /* ignore */ }
+  }
+
+  function netOpen(code, token) {
+    netClose();
+    ui.linkOk = false;
+    const conn = O.connect(code, token, {
+      room: onRoom,
+      status: (ok) => { if (ui.linkOk === ok) return; ui.linkOk = ok; if (isOnline()) renderPlayers(); },
+      gone: onGone,
+    });
+    const push = O.pusher(code, token, onPushRejected);
+    net = { code, token, conn, push };
+  }
+  function netClose() {
+    if (!net) return;
+    net.conn.close();
+    net.push.stop();
+    net = null;
+    ui.linkOk = false;
+  }
+  function pushMoves() {
+    if (isOnline() && net) net.push.send(match.round, movesOf(myPlayer().state));
+  }
+
+  // Quitter une partie à distance (nouvelle partie locale, autre salon…).
+  function onlineQuit() {
+    if (!isOnline()) return;
+    O.leave(match.code, match.token);
+    netClose();
+    toLocal();
+  }
+  // Mon verger continue en partie solo (salon quitté ou disparu).
+  function toLocal() {
+    const mine = myPlayer();
+    match = { mode: 'solo', cur: 0, players: [{ name: 'Vous', color: PLAYER_COLORS[0], state: mine.state }] };
+    syncState();
+    history = [];
+    ui.locked = false;
+  }
+
+  function onGone() {
+    netClose();
+    if (lobby) {
+      lobby = null;
+      if (els.dlgOnline.open) { setOnlineStep('form'); showOnlineError('Cette partie n’existe plus.'); }
+      return;
+    }
+    if (!isOnline()) return;
+    toLocal();
+    computeView();
+    save();
+    renderAll();
+    toast('La partie à distance n’existe plus : vous continuez seul.', 'bad');
+  }
+
+  function onPushRejected(err) {
+    // Le serveur refuse mes coups (manche finie, verger désynchronisé) : on reprend sa version.
+    const snap = err && err.data && err.data.room;
+    if (!isOnline() || !snap || snap.code !== match.code) return;
+    if (snap.round !== match.round) { onRoom(snap); return; }
+    match.cur = match.me;
+    myPlayer().state = replayState(match.seed, match.recipes, (snap.players[match.me] || {}).moves);
+    syncState();
+    history = [];
+    computeView();
+    save();
+    renderAll();
+    toast('Partie resynchronisée avec le serveur.', 'bad');
+  }
+
+  function onRoom(snap) {
+    if (!snap || !Array.isArray(snap.players)) return;
+    if (!isOnline() || match.code !== snap.code) {
+      // Salle d'attente : la partie démarre dès que le 2e joueur est là.
+      if (!lobby || lobby.code !== snap.code) return;
+      if (snap.players.length < 2) return;
+      const { seat, token } = lobby;
+      lobby = null;
+      if (els.dlgOnline.open) els.dlgOnline.close('started');
+      startOnline(snap, seat, token);
+      return;
+    }
+    if (snap.round !== match.round) { startOnline(snap, match.me, match.token); return; } // revanche
+    syncOnline(snap);
+  }
+
+  function startOnline(snap, seat, token) {
+    if (isOnline() && match.code !== snap.code) onlineQuit();
+    match = {
+      mode: 'online', code: snap.code, token, me: seat, round: snap.round, seed: snap.seed, recipes: snap.recipes, cur: seat,
+      players: snap.players.slice(0, 2).map((p, i) => ({
+        name: p.name, color: PLAYER_COLORS[i], online: p.online, left: p.left,
+        state: replayState(snap.seed, snap.recipes, p.moves),
+      })),
+    };
+    syncState();
+    history = [];
+    clearTimeout(ui.turnTimer);
+    ui.locked = false;
+    ui.sel = null; ui.pos = null; ui.rot = 0; ui.fresh = true;
+    ui.endShown = allOver();
+    closeRecipePop();
+    if (els.dlgEnd.open) els.dlgEnd.close();
+    if (!net || net.code !== snap.code) netOpen(snap.code, token);
+    computeView();
+    save();
+    renderAll();
+    // Écran d'accueil de la manche
+    const op = oppPlayer();
+    let h = `<div class="turn-head"><span class="big-dot" style="background:${myPlayer().color}"></span><div><h2>${snap.round > 1 ? 'Revanche' : 'Partie'} contre ${esc(op.name)} !</h2>`;
+    h += `<p>Mêmes cartes pour les deux · chacun joue à son rythme</p></div></div>`;
+    h += scoreboardHtml();
+    h += '<p class="small-note">Le score de votre adversaire s’affiche en direct en haut du verger.</p>';
+    els.turnBody.innerHTML = h;
+    if (els.dlgTurn.open) els.dlgTurn.close();
+    sfx('turn');
+    openDialog(els.dlgTurn);
+  }
+
+  function syncOnline(snap) {
+    let changed = false;
+    snap.players.slice(0, 2).forEach((sp, i) => {
+      const p = match.players[i];
+      if (!p) return;
+      if (i !== match.me && sp.left && !p.left) toast(`${sp.name} a quitté la partie.`, 'bad');
+      p.name = sp.name;
+      p.online = sp.online;
+      p.left = sp.left;
+      if (sameMoves(movesOf(p.state), sp.moves)) return;
+      // Mes coups : c'est mon appareil qui fait foi (le serveur peut être en retard).
+      if (i === match.me) { pushMoves(); return; }
+      const wasOver = p.state.over;
+      p.state = replayState(match.seed, match.recipes, sp.moves);
+      changed = true;
+      if (!wasOver && p.state.over && !myPlayer().state.over) toast(`${p.name} a terminé son verger : ${H.score(p.state).total} fruits.`);
+    });
+    syncState();
+    if (changed && viewedIndex() !== match.me) computeView(true);
+    save();
+    if (changed && viewedIndex() !== match.me) renderAll(); else renderSide();
+    if (onlineFinished() && !ui.endShown) { clearTimeout(ui.turnTimer); ui.turnTimer = setTimeout(showEnd, 900); }
+  }
+
+  // Fin de partie à distance : les deux vergers terminés, ou l'adversaire est parti.
+  const onlineFinished = () => allOver() || (myPlayer().state.over && oppPlayer().left);
+
+  function onlineRematch(same) {
+    if (!isOnline()) return;
+    if (oppPlayer().left) { toast(`${oppPlayer().name} a quitté la partie.`, 'bad'); return; }
+    toast(same ? 'On rejoue les mêmes cartes…' : 'Revanche : nouvelles cartes…');
+    O.rematch(match.code, match.token, match.round, same).catch((e) => toast(e.message, 'bad'));
+  }
+
+  // Fenêtre « Jouer à distance » : créer (code à partager) ou rejoindre.
+  function openOnline(mode, code) {
+    lobby = null;
+    els.inOName.value = prefs.onlineName || (prefs.names && prefs.names[0]) || '';
+    els.inORecipes.checked = !!(state && state.recipes);
+    (mode === 'join' ? els.inOJoin : els.inOCreate).checked = true;
+    els.inOCode.value = code || '';
+    setOnlineStep('form');
+    updateOnlineMode();
+    openDialog(els.dlgOnline);
+  }
+  function updateOnlineMode() {
+    const join = els.inOJoin.checked;
+    els.onlineCreate.hidden = join;
+    els.onlineJoin.hidden = !join;
+    els.btnOnlineGo.textContent = join ? 'Rejoindre' : 'Créer la partie';
+    els.onlineError.hidden = true;
+  }
+  function setOnlineStep(step, code) {
+    els.onlineForm.hidden = step !== 'form';
+    els.onlineWait.hidden = step !== 'wait';
+    els.btnOnlineGo.hidden = step !== 'form';
+    if (code) els.onlineCode.textContent = code;
+    els.onlineError.hidden = true;
+  }
+  function showOnlineError(msg) {
+    els.onlineError.textContent = msg;
+    els.onlineError.hidden = false;
+  }
+  const cleanCode = (v) => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
+
+  async function onlineGo() {
+    if (ui.onlineBusy) return;
+    const join = els.inOJoin.checked;
+    const name = els.inOName.value.trim();
+    const code = cleanCode(els.inOCode.value);
+    if (join && code.length !== 4) { showOnlineError('Le code de la partie fait 4 caractères.'); sfx('bad'); els.inOCode.focus(); return; }
+    prefs.onlineName = name;
+    savePrefs();
+    ui.onlineBusy = true;
+    els.btnOnlineGo.disabled = true;
+    els.onlineError.hidden = true;
+    try {
+      const r = join ? await O.join(code, name, loadTokens()[code]) : await O.create(name, els.inORecipes.checked);
+      const c = join ? code : r.code;
+      if (isOnline() && match.code !== c) onlineQuit(); // on quitte l'ancienne partie à distance
+      rememberToken(c, r.token);
+      if (isOnline() && match.code === c) { // déjà dans cette partie : on y retourne
+        els.dlgOnline.close('started');
+        onRoom(r.room);
+      } else {
+        lobby = { code: c, token: r.token, seat: r.seat };
+        netOpen(c, r.token);
+        if (r.room.players.length >= 2) onRoom(r.room);
+        else { setOnlineStep('wait', c); sfx('ui'); }
+      }
+    } catch (e) {
+      showOnlineError(e.message);
+      sfx('bad');
+    }
+    ui.onlineBusy = false;
+    els.btnOnlineGo.disabled = false;
+  }
+  els.btnOnlineGo.addEventListener('click', onlineGo);
+  for (const r of [els.inOCreate, els.inOJoin]) r.addEventListener('change', updateOnlineMode);
+  els.inOCode.addEventListener('input', () => { const v = cleanCode(els.inOCode.value); if (v !== els.inOCode.value) els.inOCode.value = v; });
+  // Entrée valide (et n'appuie pas sur « Annuler », premier bouton du formulaire)
+  for (const inp of [els.inOName, els.inOCode]) inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); onlineGo(); } });
+  els.dlgOnline.addEventListener('close', () => {
+    if (!lobby) return; // la partie a démarré
+    O.leave(lobby.code, lobby.token); // annulé pendant l'attente
+    lobby = null;
+    netClose();
+  });
+  els.btnOnlineShare.addEventListener('click', () => {
+    const code = els.onlineCode.textContent;
+    const u = new URL(location.href);
+    u.search = '';
+    u.hash = '';
+    u.searchParams.set('rejoindre', code);
+    const text = `Viens jouer à Ortie avec moi ! Code de la partie : ${code}`;
+    const copied = () => {
+      els.btnOnlineShare.textContent = 'Lien copié ✔';
+      setTimeout(() => { els.btnOnlineShare.textContent = 'Envoyer le lien d’invitation'; }, 2000);
+    };
+    if (navigator.share) { navigator.share({ title: 'Ortie', text, url: u.toString() }).catch(() => {}); return; }
+    try {
+      if (navigator.clipboard) navigator.clipboard.writeText(text + ' ' + u).then(copied, () => window.prompt('Copiez ce lien :', u.toString()));
+      else window.prompt('Copiez ce lien :', u.toString());
+    } catch (e) { window.prompt('Copiez ce lien :', u.toString()); }
+  });
+  // Retour sur l'appli (téléphone verrouillé, autre appli…) : on se reconnecte.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible' || !net) return;
+    const n = net;
+    const keep = lobby;
+    netOpen(n.code, n.token);
+    lobby = keep;
+    pushMoves();
+  });
+
   // Pastille du joueur / liste des joueurs : après la partie, voir chaque verger.
   els.playerPill.addEventListener('click', () => {
-    if (allOver()) viewPlayer(1 - viewedIndex());
+    if (canSwitchView()) viewPlayer(1 - viewedIndex());
+    else if (isOnline()) toast(`${oppPlayer().name} : ${H.score(oppPlayer().state).total} fruits. Son verger sera visible quand le vôtre sera terminé.`);
     else toast(`C’est au tour de ${curPlayer().name}.`);
   });
   els.playersList.addEventListener('click', (e) => {
@@ -1265,6 +1611,7 @@
     const v = els.dlgMenu.returnValue;
     if (v === 'solo') openNew('solo');
     else if (v === 'duo') openNew('duo');
+    else if (v === 'online') openOnline('create');
     else if (v === 'custom') openCustom();
     else if (v === 'settings') openSettings();
     else if (v === 'rules') openDialog(els.dlgRules);
@@ -1393,8 +1740,14 @@
     computeView();
     renderAll();
     if (allOver()) ui.endShown = true;
+    if (isOnline()) netOpen(match.code, match.token); // on retrouve la partie à distance
   } else {
     start(null, false);
+  }
+  const invite = cleanCode(params.get('rejoindre'));
+  if (invite) {
+    try { window.history.replaceState(null, '', location.pathname); } catch (e) { /* ignore */ }
+    if (!(isOnline() && match.code === invite)) openOnline('join', invite);
   }
   window.__ortieReady = true; // le jeu a démarré (voir le garde-fou dans index.html)
   try { sessionStorage.removeItem('ortie.autofix'); } catch (e) { /* ignore */ }

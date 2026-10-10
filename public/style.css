@@ -697,3 +697,21 @@ body.rb-below .recipe-pop { top: 98px; max-height: calc(100% - 108px); }
   /* sur grand écran, les recettes sont déjà dans le panneau de droite */
   .recipe-bar, .recipe-pop { display: none !important; }
 }
+
+/* ------------------------------------------------------------ Jouer à distance */
+.online .o-help { display: block; margin-top: 10px; color: var(--muted); font-size: 13px; line-height: 1.4; }
+.online .field { margin-bottom: 12px; }
+.code-input { text-transform: uppercase; text-align: center; font: 800 26px 'Nunito', sans-serif !important; letter-spacing: 10px; padding-left: 20px !important; }
+.code-input::placeholder { letter-spacing: 10px; opacity: .35; }
+.o-error { margin: 10px 0 0; padding: 8px 12px; border-radius: 12px; background: rgba(196, 69, 42, .12); color: var(--bad); font-weight: 700; font-size: 14px; }
+.o-wait { text-align: center; }
+.o-wait > p:first-child { margin: 4px 0 10px; color: var(--muted); font-weight: 700; }
+.o-code {
+  font: 800 46px 'Nunito', sans-serif; letter-spacing: 14px; padding: 10px 0 10px 14px; margin: 0 auto 14px; max-width: 280px;
+  color: var(--brand); background: var(--surface-2); border: 2px dashed var(--line); border-radius: 18px; user-select: all; -webkit-user-select: all;
+}
+.o-waiting { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 16px 0 4px; color: var(--muted); font-weight: 700; }
+.o-spin { width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--line); border-top-color: var(--brand); animation: o-spin 0.9s linear infinite; }
+@keyframes o-spin { to { transform: rotate(360deg); } }
+.player-pill .net-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: #b9b29a; margin-left: 2px; }
+.player-pill .net-dot.on { background: #2e8b48; box-shadow: 0 0 0 3px rgba(46, 139, 72, .18); }

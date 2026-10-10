@@ -8,10 +8,10 @@ Adaptation numérique du jeu de cartes *Hortis* (Mark Tuck, Origames). Les 18 ca
 
 ```bash
 npm start          # http://localhost:3000 (variable PORT pour changer de port)
-npm test           # tests du moteur de règles
+npm test           # tests du moteur de règles et des parties à distance
 ```
 
-Le projet n'a aucune dépendance : un petit serveur Node (`server.js`) sert les fichiers statiques de `public/`.
+Le projet n'a aucune dépendance : un petit serveur Node (`server.js`) sert les fichiers statiques de `public/` et gère les parties à distance (`rooms.js`, adresses `/api/…`).
 
 ## Installer l'application (iOS, Android, PC)
 
@@ -23,11 +23,13 @@ Ortie est une application web installable (PWA). Le bouton **Télécharger**, en
 
 Une fois installée, Ortie s'ouvre en plein écran depuis l'écran d'accueil ou le menu Démarrer, et fonctionne **hors connexion** grâce au service worker (`public/sw.js`).
 
-**Mises à jour fiables.** Les fichiers du jeu sont chargés avec leur numéro de version (`style.css?v=1.15`, `app.js?v=1.15`…). Une nouvelle page ne peut donc jamais utiliser un ancien style ou un ancien code resté en cache, que ce soit sur le téléphone, dans l'appli installée ou chez l'hébergeur. **À chaque nouvelle version, changer le numéro à trois endroits** : `APP_VERSION` dans `app.js`, `VERSION` dans `sw.js` et les `?v=` de `index.html` (cinq fichiers, dont `sound.js`). Un test (`npm test`) vérifie qu'ils sont identiques. Le serveur revalide les fichiers par empreinte de contenu (ETag), pas par date. Si le jeu ne démarre pas, l'appli vide son cache et se recharge toute seule, une seule fois. L'option « Vider le cache et recharger » existe aussi dans le menu Ortie → Paramètres. L'installation exige que le site soit servi en **https** (c'est le cas sur Railway, Coolify, etc.).
+**Mises à jour fiables.** Les fichiers du jeu sont chargés avec leur numéro de version (`style.css?v=1.16`, `app.js?v=1.16`…). Une nouvelle page ne peut donc jamais utiliser un ancien style ou un ancien code resté en cache, que ce soit sur le téléphone, dans l'appli installée ou chez l'hébergeur. **À chaque nouvelle version, changer le numéro à trois endroits** : `APP_VERSION` dans `app.js`, `VERSION` dans `sw.js` et les `?v=` de `index.html` (six fichiers, dont `sound.js` et `online.js`). Un test (`npm test`) vérifie qu'ils sont identiques. Le serveur revalide les fichiers par empreinte de contenu (ETag), pas par date. Si le jeu ne démarre pas, l'appli vide son cache et se recharge toute seule, une seule fois. L'option « Vider le cache et recharger » existe aussi dans le menu Ortie → Paramètres. L'installation exige que le site soit servi en **https** (c'est le cas sur Railway, Coolify, etc.).
 
 ## Déploiement avec Nixpacks
 
 Nixpacks détecte le projet Node grâce à `package.json`, et `nixpacks.toml` fixe Node 20 et la commande de démarrage (`node server.js`). Le serveur écoute sur `$PORT` (par défaut 3000) et répond sur `/healthz` pour le contrôle de santé.
+
+Les parties à distance ont besoin de ce serveur Node (un simple hébergement de fichiers statiques ne suffit pas). Les salons sont gardés en mémoire : il faut **une seule instance**, et un redéploiement ou un redémarrage termine les parties à distance en cours (chaque joueur garde alors son verger et continue seul). Le flux en direct utilise les Server-Sent Events, compatibles avec Railway, Coolify (Traefik) ou nginx.
 
 ```bash
 nixpacks build . --name ortie
@@ -51,9 +53,15 @@ docker run -p 3000:3000 -e PORT=3000 ortie
 
 ## Menu (logo en haut à gauche)
 
-Le menu est rangé en quatre sections séparées : **Jouer** (partie solo, à deux), **Apparence** (Personnaliser), **Réglages** (Paramètres) et **Aide** (règles, installation).
+Le menu est rangé en quatre sections séparées : **Jouer** (partie solo, à deux, à distance), **Apparence** (Personnaliser), **Réglages** (Paramètres) et **Aide** (règles, installation).
 
 - **Partie solo** et **Jouer à deux** : à deux, sur le même appareil, les joueurs reçoivent les mêmes 9 cartes et construisent chacun leur verger à tour de rôle (un écran « À … de jouer » invite à se passer l'appareil). Le meilleur score gagne, puis le plus de dés en jeu en cas d'égalité, comme dans la règle multijoueur du jeu. À la fin, la pastille du joueur en haut du plateau permet de regarder chaque verger.
+- **Jouer à distance** : chacun joue sur son propre téléphone.
+  - Un joueur choisit **Créer** (avec ou sans Recettes) et reçoit un **code à 4 caractères** (ex. `D8PE`). Le bouton « Envoyer le lien d'invitation » le partage (SMS, WhatsApp…) ; le lien `…/?rejoindre=D8PE` ouvre directement la bonne fenêtre.
+  - L'autre choisit **Rejoindre** et tape le code. La partie démarre aussitôt sur les deux appareils.
+  - Mêmes 9 cartes pour les deux, chacun pose ses cartes **à son rythme**, sans attendre l'autre. En haut du plateau, la pastille de l'adversaire montre en direct sa carte, son score et s'il est en ligne (point vert).
+  - Une fois son verger terminé, on peut toucher la pastille pour suivre le verger de l'autre en direct. Quand les deux ont fini, le résultat s'affiche chez les deux joueurs ; « Revanche » relance une manche avec de nouvelles cartes, « Rejouer ces cartes » avec les mêmes.
+  - On peut fermer l'appli ou recharger la page : la partie reprend où elle en était. « Annuler » fonctionne pour ses propres coups. Le serveur vérifie chaque coup avec le moteur de règles. Une nouvelle partie solo ou à deux quitte la partie à distance (l'adversaire le voit).
 - **Personnaliser** :
   - **Thème** : automatique (comme le téléphone), clair ou sombre.
   - **Fond du terrain** : chêne clair, noyer, tapis bleu, lin, ardoise, tomettes.

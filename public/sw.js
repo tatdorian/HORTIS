@@ -5,7 +5,7 @@
  * toujours le style et le code de sa propre version, jamais un ancien fichier
  * resté en cache.
  */
-const VERSION = '1.15';
+const VERSION = '1.16';
 const CACHE = 'ortie-' + VERSION;
 const ASSETS = [
   './',
@@ -13,6 +13,7 @@ const ASSETS = [
   'style.css?v=' + VERSION,
   'core.js?v=' + VERSION,
   'sound.js?v=' + VERSION,
+  'online.js?v=' + VERSION,
   'app.js?v=' + VERSION,
   'install.js?v=' + VERSION,
   'manifest.webmanifest',
@@ -67,6 +68,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   if (url.origin !== self.location.origin) return;
+  if (url.pathname.includes('/api/')) return; // parties à distance : toujours en direct, jamais en cache
 
   // Page : toujours la plus récente (sans cache HTTP), sinon la copie hors connexion.
   if (req.mode === 'navigate') {

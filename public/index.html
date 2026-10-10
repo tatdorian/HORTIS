@@ -20,7 +20,7 @@
   <!-- Le numéro de version dans l'adresse des fichiers garantit qu'une page neuve
        ne charge jamais un ancien style.css / app.js gardé en cache (téléphone,
        appli installée ou hébergeur). À changer à chaque version (cf. sw.js). -->
-  <link rel="stylesheet" href="style.css?v=1.15">
+  <link rel="stylesheet" href="style.css?v=1.16">
   <script>
     /* Garde-fou silencieux : si le jeu ne démarre pas (ex. un ancien fichier
        resté en cache), on recharge automatiquement la dernière version, une
@@ -144,7 +144,7 @@
       <div id="duo-names" class="duo-names" hidden>
         <label class="field"><span><i class="who-dot p0"></i> Joueur 1</span><input id="in-p1" maxlength="14" autocomplete="off" placeholder="Joueur 1"></label>
         <label class="field"><span><i class="who-dot p1"></i> Joueur 2</span><input id="in-p2" maxlength="14" autocomplete="off" placeholder="Joueur 2"></label>
-        <small>Mêmes 9 cartes pour les deux, chacun son verger : on joue à tour de rôle sur le même appareil. Le meilleur score gagne (égalité : le plus de dés en jeu).</small>
+        <small>Mêmes 9 cartes pour les deux, chacun son verger : on joue à tour de rôle sur le même appareil. Le meilleur score gagne (égalité : le plus de dés en jeu). Chacun sur son téléphone ? Menu Ortie → Jouer à distance.</small>
       </div>
       <label class="field">Numéro de partie
         <input id="in-seed" name="seed" inputmode="numeric" autocomplete="off" placeholder="au hasard">
@@ -163,6 +163,42 @@
     </form>
   </dialog>
 
+  <!-- Jouer à distance : créer une partie ou la rejoindre avec un code -->
+  <dialog id="dlg-online" class="dlg small online">
+    <form method="dialog">
+      <h2>Jouer à distance</h2>
+      <div id="online-form">
+        <div class="seg" role="radiogroup" aria-label="Créer ou rejoindre">
+          <label><input type="radio" name="omode" value="create" id="in-o-create" checked><span>Créer</span></label>
+          <label><input type="radio" name="omode" value="join" id="in-o-join"><span>Rejoindre</span></label>
+        </div>
+        <label class="field">Votre nom
+          <input id="in-oname" maxlength="14" autocomplete="off" placeholder="Votre nom">
+        </label>
+        <div id="online-create">
+          <label class="switch"><input id="in-orecipes" type="checkbox"><span></span> Jouer avec 2 Recettes (objectif à atteindre)</label>
+          <small class="o-help">Vous recevrez un code à 4 caractères à donner à votre adversaire. Mêmes cartes pour les deux, chacun joue sur son appareil et à son rythme.</small>
+        </div>
+        <div id="online-join" hidden>
+          <label class="field">Code de la partie
+            <input id="in-ocode" class="code-input" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCD" enterkeyhint="go">
+          </label>
+        </div>
+        <p id="online-error" class="o-error" role="alert" hidden></p>
+      </div>
+      <div id="online-wait" class="o-wait" hidden>
+        <p>Donnez ce code à votre adversaire :</p>
+        <div id="online-code" class="o-code" aria-live="polite"></div>
+        <button type="button" id="btn-online-share" class="btn ghost">Envoyer le lien d’invitation</button>
+        <p class="o-waiting"><span class="o-spin" aria-hidden="true"></span> En attente de l’autre joueur…</p>
+      </div>
+      <div class="dlg-actions">
+        <button value="cancel" class="btn ghost">Annuler</button>
+        <button type="button" id="btn-online-go" class="btn primary">Créer la partie</button>
+      </div>
+    </form>
+  </dialog>
+
   <!-- Menu (logo) -->
   <dialog id="dlg-menu" class="dlg small menu">
     <form method="dialog">
@@ -175,7 +211,8 @@
         <section class="menu-sec" aria-label="Jouer">
           <h3 class="menu-sec-title">Jouer</h3>
           <button value="solo" class="menu-item"><span class="mi-ico" style="--c:#3f8f3a">🌱</span><span class="mi-txt"><b>Partie solo</b><small>Battez votre record en 9 cartes</small></span></button>
-          <button value="duo" class="menu-item"><span class="mi-ico" style="--c:#3b7fc4">👥</span><span class="mi-txt"><b>Jouer à deux</b><small>Mêmes cartes, chacun son verger, à tour de rôle</small></span></button>
+          <button value="duo" class="menu-item"><span class="mi-ico" style="--c:#3b7fc4">👥</span><span class="mi-txt"><b>Jouer à deux</b><small>Sur le même appareil, à tour de rôle</small></span></button>
+          <button value="online" class="menu-item"><span class="mi-ico" style="--c:#7a4fc4">🌍</span><span class="mi-txt"><b>Jouer à distance</b><small>Chacun sur son téléphone, avec un code</small></span></button>
         </section>
         <section class="menu-sec" aria-label="Apparence">
           <h3 class="menu-sec-title">Apparence</h3>
@@ -282,7 +319,7 @@
       <div class="dlg-actions">
         <button value="close" class="btn ghost">Voir le verger</button>
         <button value="again" class="btn ghost">Rejouer ces cartes</button>
-        <button value="next" class="btn primary">Nouvelle partie</button>
+        <button value="next" id="btn-end-next" class="btn primary">Nouvelle partie</button>
       </div>
     </form>
   </dialog>
@@ -379,9 +416,10 @@
     </defs>
   </svg>
 
-  <script src="core.js?v=1.15"></script>
-  <script src="sound.js?v=1.15"></script>
-  <script src="app.js?v=1.15"></script>
-  <script src="install.js?v=1.15"></script>
+  <script src="core.js?v=1.16"></script>
+  <script src="sound.js?v=1.16"></script>
+  <script src="online.js?v=1.16"></script>
+  <script src="app.js?v=1.16"></script>
+  <script src="install.js?v=1.16"></script>
 </body>
 </html>
