@@ -626,7 +626,7 @@ kbd { background: var(--surface-2); border: 1px solid var(--line); border-bottom
 .seg input { position: absolute; opacity: 0; inset: 0; margin: 0; }
 .seg span { display: block; text-align: center; padding: 10px; border-radius: 10px; font-weight: 800; cursor: pointer; }
 .seg input:checked + span { background: var(--surface); box-shadow: 0 2px 8px rgba(0, 0, 0, .12); color: var(--brand); }
-.seg input:focus-visible + span { outline: 3px solid var(--accent); }
+body.kbd .seg input:focus-visible + span { outline: 3px solid var(--accent); } /* au clavier seulement : à l'ouverture d'une fenêtre, le 1er choix reçoit le focus sans être sélectionné */
 .duo-names { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
 .duo-names small { grid-column: 1 / -1; color: var(--muted); font-weight: 400; }
 .field > span { display: inline-flex; align-items: center; }
@@ -960,3 +960,13 @@ svg .die-big { font: 800 31px 'Nunito', sans-serif; }
   .opt-grid.accents, .opt-grid.boards, .opt-grid.cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .custom-tabs span { font-size: 13px; padding: 9px 2px; }
 }
+
+/* Rejoindre : appli installée, code à coller */
+.o-app { display: grid; gap: 8px; margin: 2px 0 12px; padding: 10px 12px; border-radius: 14px; background: color-mix(in srgb, var(--brand) 10%, var(--surface-2)); border: 1px solid color-mix(in srgb, var(--brand) 35%, var(--line)); }
+.o-app p { margin: 0; font-size: 14px; line-height: 1.4; }
+.o-app .btn { justify-self: start; min-height: 42px; }
+.o-app small { color: var(--muted); font-size: 12.5px; }
+.code-row { display: flex; gap: 8px; align-items: stretch; margin-top: 6px; }
+.code-row .code-input { flex: 1; min-width: 0; font: inherit; padding: 10px 12px; border-radius: 12px; border: 2px solid var(--line); background: var(--surface-2); color: var(--ink); min-height: 44px; }
+.o-paste { flex: none; min-height: 44px; padding: 0 12px; font-size: 14px; }
+a.btn { text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }

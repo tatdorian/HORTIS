@@ -4,7 +4,7 @@
   const H = window.OrtieCore;
   const S = 100; // taille d'une case en unités SVG
   const CW = H.CARD_W * S, CH = H.CARD_H * S;
-  const APP_VERSION = '1.23';
+  const APP_VERSION = '1.24';
   const STORE_KEY = 'ortie.save.v3';
   const OLD_STORE_KEY = 'ortie.save.v2';
   const SEEN_KEY = 'ortie.seenRules';
@@ -1781,7 +1781,9 @@
   }
 
   // Fenêtre « Jouer à distance » : créer (code à partager) ou rejoindre.
-  function openOnline(mode, code) {
+  // fromLink : ouvert par un lien d'invitation (dans le navigateur, on
+  // propose alors de continuer dans l'appli installée).
+  function openOnline(mode, code, fromLink) {
     lobby = null;
     els.inOName.value = prefs.onlineName || (prefs.names && prefs.names[0]) || '';
     els.inORecipes.checked = !!(state && state.recipes);
@@ -1789,7 +1791,91 @@
     els.inOCode.value = code || '';
     setOnlineStep('form');
     updateOnlineMode();
+    renderAppBanner(fromLink ? code : null);
+    $('btn-ocode-paste').hidden = !(navigator.clipboard && navigator.clipboard.readText);
     openDialog(els.dlgOnline);
+  }
+
+  // ---- Lien d'invitation → appli installée en priorité
+  // Android : le manifeste (handle_links, launch_handler) fait ouvrir le lien
+  // dans l'appli installée ; si le navigateur l'a quand même ouvert, un bouton
+  // la lance. iPhone : Apple ne laisse aucun lien ouvrir une appli de l'écran
+  // d'accueil ; on copie le code, à « Coller » dans l'appli.
+  const UA = navigator.userAgent || '';
+  const IS_IOS = /iPad|iPhone|iPod/.test(UA) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const IS_ANDROID = /Android/i.test(UA);
+  const IN_APP = ['standalone', 'fullscreen', 'window-controls-overlay'].some((m) => window.matchMedia('(display-mode: ' + m + ')').matches) || navigator.standalone === true;
+  async function appInstalled() {
+    try { if (localStorage.getItem('ortie.installed') === '1') return true; } catch (e) { /* ignore */ }
+    try { if (navigator.getInstalledRelatedApps) return (await navigator.getInstalledRelatedApps()).length > 0; } catch (e) { /* ignore */ }
+    return false;
+  }
+  function inviteUrl(code) {
+    const u = new URL(location.href);
+    u.search = '';
+    u.hash = '';
+    u.searchParams.set('rejoindre', code);
+    return u;
+  }
+  async function renderAppBanner(code) {
+    const box = $('online-app');
+    box.hidden = true;
+    if (!code || IN_APP) return;
+    if (IS_IOS) {
+      box.innerHTML = `<p>📲 Vous jouez avec l’appli Ortie de l’écran d’accueil ? Copiez le code, ouvrez l’appli, puis <b>Jouer à distance → Rejoindre → Coller</b>.</p><button type="button" class="btn primary" id="btn-ocode-copy">Copier le code ${code}</button>`;
+      box.hidden = false;
+      $('btn-ocode-copy').addEventListener('click', (e) => {
+        const b = e.currentTarget;
+        const ok = () => { b.textContent = 'Code copié ✔ — ouvrez l’appli Ortie'; };
+        try { navigator.clipboard.writeText(code).then(ok, () => window.prompt('Copiez ce code :', code)); } catch (err) { window.prompt('Copiez ce code :', code); }
+      });
+      return;
+    }
+    if (IS_ANDROID && await appInstalled()) {
+      const u = inviteUrl(code);
+      const intent = `intent://${u.host}${u.pathname}${u.search}#Intent;scheme=${u.protocol.replace(':', '')};action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;S.browser_fallback_url=${encodeURIComponent(u.toString())};end`;
+      box.innerHTML = `<p>📲 L’appli Ortie est installée sur ce téléphone.</p><a class="btn primary" id="btn-open-app" href="${esc(intent)}">Ouvrir dans l’appli</a><small>ou continuez ici, dans le navigateur.</small>`;
+      box.hidden = false;
+    }
+  }
+  // « Coller » : retrouve le code dans le presse-papiers (code seul, message ou lien d'invitation).
+  function codeFromText(t) {
+    const txt = String(t || '');
+    const m = /[?&]rejoindre=([A-Za-z0-9]{4})/.exec(txt) || /code\s*(?:de la partie)?\s*:?\s*([A-Za-z0-9]{4})\b/i.exec(txt) || /\b([A-HJ-NP-Z2-9]{4})\b/.exec(txt) || /^\s*([A-Za-z0-9]{4})\s*$/.exec(txt);
+    return m ? cleanCode(m[1]) : '';
+  }
+  $('btn-ocode-paste').addEventListener('click', async () => {
+    let txt = '';
+    try { txt = await navigator.clipboard.readText(); } catch (e) { showOnlineError('Impossible de lire le presse-papiers : tapez le code.'); return; }
+    const code = codeFromText(txt);
+    if (!code) { showOnlineError('Aucun code de partie dans le presse-papiers.'); return; }
+    els.inOCode.value = code;
+    els.onlineError.hidden = true;
+    sfx('ui');
+  });
+
+  // Appli déjà ouverte : un lien d'invitation (ou de défi) arrive ici sans
+  // recharger la page, la partie en cours n'est pas perdue (launch_handler).
+  function handleAppLink(href) {
+    let u;
+    try { u = new URL(href); } catch (e) { return; }
+    const code = cleanCode(u.searchParams.get('rejoindre'));
+    if (code) {
+      if (isOnline() && match.code === code) toast('Vous êtes déjà dans cette partie.');
+      else openOnline('join', code, true);
+      return;
+    }
+    const seed = u.searchParams.get('partie');
+    if (seed) { // défi : on prépare la partie, le joueur confirme
+      const rp = u.searchParams.get('recettes');
+      const ids = rp ? rp.split(',').map(Number).filter(Boolean) : [];
+      openNew('solo');
+      els.inSeed.value = seed;
+      els.inRecipes.checked = rp != null;
+      els.recipePick.hidden = !els.inRecipes.checked;
+      els.inR1.value = ids[0] || '';
+      els.inR2.value = ids[1] || '';
+    }
   }
   function updateOnlineMode() {
     const join = els.inOJoin.checked;
@@ -1856,11 +1942,8 @@
   });
   els.btnOnlineShare.addEventListener('click', () => {
     const code = els.onlineCode.textContent;
-    const u = new URL(location.href);
-    u.search = '';
-    u.hash = '';
-    u.searchParams.set('rejoindre', code);
-    const text = `Viens jouer à Ortie avec moi ! Code de la partie : ${code}`;
+    const u = inviteUrl(code);
+    const text = `Viens jouer à Ortie avec moi ! Dans l’appli : Jouer à distance → Rejoindre → code ${code}. Ou touche ce lien :`;
     const copied = () => {
       els.btnOnlineShare.textContent = 'Lien copié ✔';
       setTimeout(() => { els.btnOnlineShare.textContent = 'Envoyer le lien d’invitation'; }, 2000);
@@ -2100,6 +2183,7 @@
   for (const el of document.querySelectorAll('.app-version')) el.textContent = APP_VERSION;
   renderLegend();
   fillRecipeSelects();
+  const BOOT_URL = location.href;
   const params = new URLSearchParams(location.search);
   if (params.get('partie')) {
     const rp = params.get('recettes');
@@ -2118,7 +2202,17 @@
   const invite = cleanCode(params.get('rejoindre'));
   if (invite) {
     try { window.history.replaceState(null, '', location.pathname); } catch (e) { /* ignore */ }
-    if (!(isOnline() && match.code === invite)) openOnline('join', invite);
+    if (!(isOnline() && match.code === invite)) openOnline('join', invite, true);
+  }
+  // Appli installée et déjà ouverte : les liens suivants arrivent par launchQueue
+  if (window.launchQueue && typeof window.launchQueue.setConsumer === 'function') {
+    let firstLaunch = true;
+    window.launchQueue.setConsumer((lp) => {
+      const target = lp && lp.targetURL;
+      const already = firstLaunch && target === BOOT_URL; // lien de démarrage : déjà traité ci-dessus
+      firstLaunch = false;
+      if (target && !already) handleAppLink(target);
+    });
   }
   if (checkLockedPrefs()) { applyPrefs(); renderAll(); renderLegend(); }
   achBadge();
