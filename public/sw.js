@@ -5,13 +5,14 @@
  * toujours le style et le code de sa propre version, jamais un ancien fichier
  * resté en cache.
  */
-const VERSION = '1.10';
+const VERSION = '1.11';
 const CACHE = 'ortie-' + VERSION;
 const ASSETS = [
   './',
   'index.html',
   'style.css?v=' + VERSION,
   'core.js?v=' + VERSION,
+  'sound.js?v=' + VERSION,
   'app.js?v=' + VERSION,
   'install.js?v=' + VERSION,
   'manifest.webmanifest',

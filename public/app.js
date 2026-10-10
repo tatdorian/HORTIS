@@ -4,7 +4,7 @@
   const H = window.OrtieCore;
   const S = 100; // taille d'une case en unités SVG
   const CW = H.CARD_W * S, CH = H.CARD_H * S;
-  const APP_VERSION = '1.10';
+  const APP_VERSION = '1.11';
   const STORE_KEY = 'ortie.save.v3';
   const OLD_STORE_KEY = 'ortie.save.v2';
   const SEEN_KEY = 'ortie.seenRules';
@@ -25,8 +25,15 @@
   };
   const BOARDS = { oak: 'Chêne clair', walnut: 'Noyer', felt: 'Tapis bleu', linen: 'Lin', slate: 'Ardoise', terracotta: 'Tomettes' };
   const PLAYER_COLORS = ['#f06a32', '#3b7fc4'];
-  const prefs = { board: 'oak', cards: 'classic', names: ['', ''] };
-  try { Object.assign(prefs, JSON.parse(localStorage.getItem(PREFS_KEY) || '{}')); } catch (e) { /* ignore */ }
+  const prefs = { board: 'oak', cards: 'classic', names: ['', ''], sound: { music: true, sfx: true, musicVol: 0.4, sfxVol: 0.7 } };
+  try {
+    const saved = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
+    Object.assign(prefs, saved, { sound: Object.assign({}, prefs.sound, saved.sound || {}) });
+  } catch (e) { /* ignore */ }
+  // Son (sound.js) : musique et effets, désactivables et réglables dans les Paramètres
+  const snd = window.OrtieSound || { configure() {}, play() {}, dice() {} };
+  snd.configure(prefs.sound);
+  const sfx = (name, opt) => { try { snd.play(name, opt); } catch (e) { /* le son ne doit jamais bloquer le jeu */ } };
   if (!BOARDS[prefs.board]) prefs.board = 'oak';
   if (!CARD_THEMES[prefs.cards]) prefs.cards = 'classic';
   function savePrefs() { try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch (e) { /* ignore */ } }
@@ -580,7 +587,7 @@
   function selectCard(id) {
     if (state.over || ui.locked) return;
     if (ui.sel === id) { ui.sel = null; ui.pos = null; }
-    else { ui.sel = id; ui.rot = 0; ui.pos = null; ui.anchor = null; }
+    else { ui.sel = id; ui.rot = 0; ui.pos = null; ui.anchor = null; sfx('select'); }
     renderHand();
     renderGhost();
   }
@@ -603,7 +610,7 @@
       if (Math.hypot(pt.clientX - d.x, pt.clientY - d.y) < 10) return;
       d.moved = true;
       document.body.classList.add('dragging');
-      if (ui.sel !== d.id) { ui.sel = d.id; ui.rot = 0; ui.pos = null; ui.anchor = null; }
+      if (ui.sel !== d.id) { ui.sel = d.id; ui.rot = 0; ui.pos = null; ui.anchor = null; sfx('select'); }
       // pas de re-rendu de la main pendant le geste (l'élément touché doit rester en place)
       for (const btn of els.hand.querySelectorAll('.hand-card')) btn.classList.toggle('selected', btn.getAttribute('aria-label') === 'Carte n°' + d.id);
     }
@@ -661,7 +668,8 @@
   function suggest() {
     if (state.over || ui.locked) return;
     const m = H.bestMove(state, ui.sel != null ? [ui.sel] : state.hand);
-    if (!m) { toast('Aucune pose possible avec cette carte.', 'bad'); return; }
+    if (!m) { toast('Aucune pose possible avec cette carte.', 'bad'); sfx('bad'); return; }
+    sfx('hint');
     ui.sel = m.id; ui.rot = m.rot; ui.pos = { x: m.x, y: m.y };
     renderHand();
     renderGhost();
@@ -684,6 +692,7 @@
       ui.pos = { x: Math.round(a.x - nf.w / 2), y: Math.round(a.y - nf.h / 2) };
     }
     ui.spin = d > 0 ? 'spin-r' : 'spin-l';
+    sfx('rotate');
     renderHand();
     renderGhost();
   }
@@ -731,6 +740,7 @@
     const ev = currentEval();
     if (!ev.ok) {
       toast(ev.reason, 'bad');
+      sfx('bad');
       const ghost = els.board.querySelector('.ghost-frame');
       if (ghost) { ghost.classList.remove('shake'); void ghost.getBBox(); ghost.classList.add('shake'); }
       return;
@@ -757,6 +767,10 @@
     if (history.length > 30) history.shift();
     const evs = res.changes.map((c) => c.event);
     ui.popKeys = res.changes.filter((c) => c.die && ['new', 'up', 'basket', 'barrow'].includes(c.event)).map((c) => c.k);
+    sfx('place');
+    try { snd.dice(res.changes.filter((c) => c.die && ['new', 'up', 'basket', 'barrow'].includes(c.event)).map((c) => c.die.v)); } catch (e) { /* ignore */ }
+    const special = evs.includes('barrow') ? 'barrow' : evs.includes('basket') ? 'basket' : evs.includes('squirrel') ? 'squirrel' : null;
+    if (special) setTimeout(() => sfx(special, special === 'barrow' ? { duck: 2 } : null), 220);
     if (evs.includes('barrow')) toast('La Brouette entre en jeu : 15 fruits !', 'gold');
     else if (evs.includes('basket')) toast('Panier ! Ce dé vaut désormais 10.', 'gold');
     else if (evs.includes('squirrel')) toast('L’Écureuil garde désormais cet arbre.');
@@ -786,6 +800,7 @@
     if (prev.state.over) h += `<p class="note">Le verger de ${esc(prev.name)} est terminé (${H.score(prev.state).total} fruits) : ${esc(p.name)} joue ses dernières cartes.</p>`;
     h += scoreboardHtml();
     els.turnBody.innerHTML = h;
+    sfx('turn');
     openDialog(els.dlgTurn);
   }
 
@@ -818,6 +833,7 @@
     computeView();
     save();
     renderAll();
+    sfx('undo');
     toast(isDuo() ? `Coup annulé · à ${curPlayer().name} de jouer.` : 'Coup annulé.');
   }
 
@@ -832,8 +848,9 @@
   function showEnd() {
     if (ui.endShown) return;
     ui.endShown = true;
-    if (isDuo()) { showDuoEnd(); return; }
+    if (isDuo()) { showDuoEnd(); sfx('win', { duck: 3 }); return; }
     const sc = H.score(state);
+    sfx(state.endReason === 'blocked' || sc.won === false ? 'end' : 'win', { duck: 3 });
     els.endTitle.textContent = state.endReason === 'blocked' ? 'Le verger est bloqué !' : 'Récolte terminée !';
     let b = '';
     if (state.endReason === 'blocked') b += '<p class="note">Aucune carte de votre main ne peut plus être posée : la partie s’arrête.</p>';
@@ -919,7 +936,7 @@
     save();
     renderAll();
     try { if (location.search) window.history.replaceState(null, '', location.pathname); } catch (e) { /* ignore */ }
-    if (mode === 'duo') showTurn();
+    if (mode === 'duo') showTurn(); else sfx('start');
   }
 
   function save() {
@@ -1145,7 +1162,7 @@
   });
 
   // Menu (logo en haut à gauche)
-  els.btnMenu.addEventListener('click', () => openDialog(els.dlgMenu));
+  els.btnMenu.addEventListener('click', () => { sfx('ui'); openDialog(els.dlgMenu); });
   els.dlgMenu.addEventListener('close', () => {
     const v = els.dlgMenu.returnValue;
     if (v === 'solo') openNew('solo');
@@ -1163,7 +1180,35 @@
     els.optCards.innerHTML = Object.entries(CARD_THEMES).map(([id, T]) =>
       `<button type="button" class="opt${prefs.cards === id ? ' on' : ''}" data-card-opt="${id}" aria-pressed="${prefs.cards === id}"><svg viewBox="-6 -4 312 212" aria-hidden="true">${cardArt(H.cardById(9), id)}</svg><span class="opt-name">${T.name}</span></button>`).join('');
   }
-  function openCustom() { renderCustom(); openDialog(els.dlgCustom); }
+  function openCustom() { renderCustom(); renderSound(); openDialog(els.dlgCustom); }
+
+  const sndEls = { music: $('in-music'), sfx: $('in-sfx'), musicVol: $('in-music-vol'), sfxVol: $('in-sfx-vol'), musicVal: $('music-val'), sfxVal: $('sfx-val') };
+  function renderSound() {
+    const so = prefs.sound;
+    sndEls.music.checked = !!so.music;
+    sndEls.sfx.checked = !!so.sfx;
+    sndEls.musicVol.value = Math.round(so.musicVol * 100);
+    sndEls.sfxVol.value = Math.round(so.sfxVol * 100);
+    sndEls.musicVol.disabled = !so.music;
+    sndEls.sfxVol.disabled = !so.sfx;
+    sndEls.musicVal.textContent = so.music ? Math.round(so.musicVol * 100) + ' %' : '—';
+    sndEls.sfxVal.textContent = so.sfx ? Math.round(so.sfxVol * 100) + ' %' : '—';
+  }
+  function soundChanged() {
+    savePrefs();
+    snd.configure(prefs.sound);
+    renderSound();
+  }
+  sndEls.music.addEventListener('change', () => { prefs.sound.music = sndEls.music.checked; soundChanged(); });
+  sndEls.sfx.addEventListener('change', () => { prefs.sound.sfx = sndEls.sfx.checked; soundChanged(); if (prefs.sound.sfx) sfx('test'); });
+  sndEls.musicVol.addEventListener('input', () => { prefs.sound.musicVol = sndEls.musicVol.value / 100; soundChanged(); });
+  let testAt = 0;
+  sndEls.sfxVol.addEventListener('input', () => {
+    prefs.sound.sfxVol = sndEls.sfxVol.value / 100;
+    soundChanged();
+    const now = performance.now();
+    if (now - testAt > 180) { testAt = now; sfx('test'); }
+  });
   const btnClear = $('btn-clear-cache');
   if (btnClear) btnClear.addEventListener('click', () => {
     btnClear.disabled = true;

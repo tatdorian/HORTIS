@@ -23,7 +23,7 @@ Ortie est une application web installable (PWA). Le bouton **Télécharger**, en
 
 Une fois installée, Ortie s'ouvre en plein écran depuis l'écran d'accueil ou le menu Démarrer, et fonctionne **hors connexion** grâce au service worker (`public/sw.js`).
 
-**Mises à jour fiables.** Les fichiers du jeu sont chargés avec leur numéro de version (`style.css?v=1.10`, `app.js?v=1.10`…). Une nouvelle page ne peut donc jamais utiliser un ancien style ou un ancien code resté en cache, que ce soit sur le téléphone, dans l'appli installée ou chez l'hébergeur. **À chaque nouvelle version, changer le numéro à trois endroits** : `APP_VERSION` dans `app.js`, `VERSION` dans `sw.js` et les `?v=` de `index.html`. Un test (`npm test`) vérifie qu'ils sont identiques. Le serveur revalide les fichiers par empreinte de contenu (ETag), pas par date. Si le jeu ne démarre pas, l'appli vide son cache et se recharge toute seule, une seule fois. L'option « Vider le cache et recharger » existe aussi dans le menu Ortie → Personnaliser. L'installation exige que le site soit servi en **https** (c'est le cas sur Railway, Coolify, etc.).
+**Mises à jour fiables.** Les fichiers du jeu sont chargés avec leur numéro de version (`style.css?v=1.11`, `app.js?v=1.11`…). Une nouvelle page ne peut donc jamais utiliser un ancien style ou un ancien code resté en cache, que ce soit sur le téléphone, dans l'appli installée ou chez l'hébergeur. **À chaque nouvelle version, changer le numéro à trois endroits** : `APP_VERSION` dans `app.js`, `VERSION` dans `sw.js` et les `?v=` de `index.html` (cinq fichiers, dont `sound.js`). Un test (`npm test`) vérifie qu'ils sont identiques. Le serveur revalide les fichiers par empreinte de contenu (ETag), pas par date. Si le jeu ne démarre pas, l'appli vide son cache et se recharge toute seule, une seule fois. L'option « Vider le cache et recharger » existe aussi dans le menu Ortie → Paramètres. L'installation exige que le site soit servi en **https** (c'est le cas sur Railway, Coolify, etc.).
 
 ## Déploiement avec Nixpacks
 
@@ -49,7 +49,23 @@ docker run -p 3000:3000 -e PORT=3000 ortie
 ## Menu (logo en haut à gauche)
 
 - **Partie solo** et **Jouer à deux** : à deux, sur le même appareil, les joueurs reçoivent les mêmes 9 cartes et construisent chacun leur verger à tour de rôle (un écran « À … de jouer » invite à se passer l'appareil). Le meilleur score gagne, puis le plus de dés en jeu en cas d'égalité, comme dans la règle multijoueur du jeu. À la fin, la pastille du joueur en haut du plateau permet de regarder chaque verger.
-- **Personnaliser** : fond du terrain (chêne clair, noyer, tapis bleu, lin, ardoise, tomettes) et design des cartes (classique, printemps, automne, nuit, hiver). Les choix sont gardés sur l'appareil.
+- **Paramètres** :
+  - **Son** : musique douce et effets sonores, chacun désactivable, avec son propre volume.
+  - **Fond du terrain** : chêne clair, noyer, tapis bleu, lin, ardoise, tomettes.
+  - **Design des cartes** : classique, printemps, automne, nuit, hiver.
+  - Les choix sont gardés sur l'appareil.
+
+## Son
+
+Tout le son est synthétisé dans le navigateur (`public/sound.js`, Web Audio) : aucun fichier audio, il fonctionne hors connexion et ne pose aucune question de droits.
+
+- **Musique** : petite boucle de verger générative en do majeur pentatonique, à environ 84 bpm. Elle mêle une nappe, une basse, une mélodie de marimba et un léger bruissement de feuillage, et ne se répète jamais à l'identique. Elle se met en pause quand l'appli passe en arrière-plan et baisse pendant les fanfares.
+- **Effets** :
+  - choisir, tourner et poser une carte (« toc » de bois) ;
+  - les dés (la note monte avec la valeur), le Panier et la Brouette (roue et fanfare) ;
+  - l'Écureuil, une pose impossible, l'annulation et le conseil ;
+  - le changement de joueur, la victoire et la fin de partie.
+- Les navigateurs n'autorisent le son qu'après un premier toucher : la musique démarre au premier geste.
 - **Règles du jeu** et **Installer l'appli**.
 
 Le jeton **Brouette** prend la couleur du fruit qui l'a remplie (orange, jaune ou vert), avec une brouette en bois bien lisible.

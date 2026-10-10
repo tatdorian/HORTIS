@@ -20,7 +20,7 @@
   <!-- Le numéro de version dans l'adresse des fichiers garantit qu'une page neuve
        ne charge jamais un ancien style.css / app.js gardé en cache (téléphone,
        appli installée ou hébergeur). À changer à chaque version (cf. sw.js). -->
-  <link rel="stylesheet" href="style.css?v=1.10">
+  <link rel="stylesheet" href="style.css?v=1.11">
   <script>
     /* Garde-fou silencieux : si le jeu ne démarre pas (ex. un ancien fichier
        resté en cache), on recharge automatiquement la dernière version, une
@@ -46,7 +46,7 @@
         try { sessionStorage.setItem(KEY, '1'); } catch (e) { return; }
         clearAndReload();
       }
-      window.ortieClearCache = clearAndReload; // option du menu Ortie → Personnaliser
+      window.ortieClearCache = clearAndReload; // option du menu Ortie → Paramètres
       window.addEventListener('error', function () { setTimeout(autoFix, 300); });
       window.addEventListener('load', function () { setTimeout(autoFix, 2500); });
     })();
@@ -172,7 +172,7 @@
       <div class="menu-list">
         <button value="solo" class="menu-item"><span class="mi-ico" style="--c:#3f8f3a">🌱</span><span class="mi-txt"><b>Partie solo</b><small>Battez votre record en 9 cartes</small></span></button>
         <button value="duo" class="menu-item"><span class="mi-ico" style="--c:#3b7fc4">👥</span><span class="mi-txt"><b>Jouer à deux</b><small>Mêmes cartes, chacun son verger, à tour de rôle</small></span></button>
-        <button value="custom" class="menu-item"><span class="mi-ico" style="--c:#d9822b">🎨</span><span class="mi-txt"><b>Personnaliser</b><small>Fond du terrain, design des cartes, options</small></span></button>
+        <button value="custom" class="menu-item"><span class="mi-ico" style="--c:#d9822b">⚙️</span><span class="mi-txt"><b>Paramètres</b><small>Son, fond du terrain, design des cartes</small></span></button>
         <button value="rules" class="menu-item"><span class="mi-ico" style="--c:#8a6bc4">📖</span><span class="mi-txt"><b>Règles du jeu</b><small>Comment jouer, raccourcis</small></span></button>
         <a href="#" class="menu-item install-link" id="menu-install" hidden><span class="mi-ico" style="--c:#2f6b3a">⬇</span><span class="mi-txt"><b>Installer l’appli</b><small>iPhone, Android, ordinateur</small></span></a>
       </div>
@@ -182,7 +182,20 @@
   <!-- Personnalisation -->
   <dialog id="dlg-custom" class="dlg custom">
     <form method="dialog">
-      <h2>Personnaliser</h2>
+      <h2>Paramètres</h2>
+      <h3>Son</h3>
+      <div class="snd">
+        <div class="snd-row">
+          <label class="tgl"><input type="checkbox" id="in-music"><span class="tgl-ui" aria-hidden="true"></span><span class="snd-name">🎵 Musique</span></label>
+          <input type="range" id="in-music-vol" min="0" max="100" step="1" aria-label="Volume de la musique">
+          <span class="snd-val" id="music-val"></span>
+        </div>
+        <div class="snd-row">
+          <label class="tgl"><input type="checkbox" id="in-sfx"><span class="tgl-ui" aria-hidden="true"></span><span class="snd-name">🔔 Effets sonores</span></label>
+          <input type="range" id="in-sfx-vol" min="0" max="100" step="1" aria-label="Volume des effets sonores">
+          <span class="snd-val" id="sfx-val"></span>
+        </div>
+      </div>
       <h3>Fond du terrain</h3>
       <div id="opt-boards" class="opt-grid boards"></div>
       <h3>Design des cartes</h3>
@@ -271,8 +284,8 @@
         <p>Après la 9<sup>e</sup> carte (ou si plus aucune carte ne peut être posée), additionnez les dés posés sur des arbres. S’il n’y a plus de dé de la bonne couleur en réserve, on n’en place pas.</p>
         <h3>À deux, sur le même appareil</h3>
         <p>Touchez le logo en haut à gauche, puis <b>« Jouer à deux »</b>. Les deux joueurs reçoivent les mêmes 9 cartes et construisent chacun leur verger, à tour de rôle : on se passe l’appareil à chaque carte posée. Le meilleur score gagne ; en cas d’égalité, celui qui a le plus de dés en jeu.</p>
-        <h3>Personnaliser</h3>
-        <p>Logo en haut à gauche → <b>« Personnaliser »</b> : choisissez le fond du terrain et le design des cartes.</p>
+        <h3>Paramètres</h3>
+        <p>Logo en haut à gauche → <b>« Paramètres »</b> : musique et effets sonores (désactivables, volume réglable), fond du terrain et design des cartes.</p>
         <h3>Recettes</h3>
         <p>Au verso des cartes. Avec deux Recettes, additionnez leurs nombres : c’est votre objectif. Leur bonus s’ajoute si la condition est remplie en fin de partie. Les cartes Recette ne font pas partie de la pioche.</p>
         <h3>Raccourcis</h3>
@@ -340,8 +353,9 @@
     </defs>
   </svg>
 
-  <script src="core.js?v=1.10"></script>
-  <script src="app.js?v=1.10"></script>
-  <script src="install.js?v=1.10"></script>
+  <script src="core.js?v=1.11"></script>
+  <script src="sound.js?v=1.11"></script>
+  <script src="app.js?v=1.11"></script>
+  <script src="install.js?v=1.11"></script>
 </body>
 </html>
