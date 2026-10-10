@@ -4,7 +4,7 @@
   const H = window.OrtieCore;
   const S = 100; // taille d'une case en unités SVG
   const CW = H.CARD_W * S, CH = H.CARD_H * S;
-  const APP_VERSION = '1.9';
+  const APP_VERSION = '1.10';
   const STORE_KEY = 'ortie.save.v3';
   const OLD_STORE_KEY = 'ortie.save.v2';
   const SEEN_KEY = 'ortie.seenRules';
@@ -1164,6 +1164,13 @@
       `<button type="button" class="opt${prefs.cards === id ? ' on' : ''}" data-card-opt="${id}" aria-pressed="${prefs.cards === id}"><svg viewBox="-6 -4 312 212" aria-hidden="true">${cardArt(H.cardById(9), id)}</svg><span class="opt-name">${T.name}</span></button>`).join('');
   }
   function openCustom() { renderCustom(); openDialog(els.dlgCustom); }
+  const btnClear = $('btn-clear-cache');
+  if (btnClear) btnClear.addEventListener('click', () => {
+    btnClear.disabled = true;
+    btnClear.textContent = 'Rechargement…';
+    save();
+    if (window.ortieClearCache) window.ortieClearCache(); else location.reload();
+  });
   els.optBoards.addEventListener('click', (e) => {
     const b = e.target.closest('[data-board-opt]');
     if (!b) return;
@@ -1177,6 +1184,11 @@
     savePrefs(); renderCustom(); renderAll(); renderLegend();
   });
   els.dlgRules.addEventListener('close', () => { try { localStorage.setItem(SEEN_KEY, '1'); } catch (e) { /* ignore */ } });
+
+  // Contour de focus du logo seulement quand on navigue au clavier (jamais au doigt).
+  document.addEventListener('keydown', (e) => { if (e.key === 'Tab') document.body.classList.add('kbd'); }, true);
+  document.addEventListener('pointerdown', () => document.body.classList.remove('kbd'), true);
+  document.addEventListener('touchstart', () => document.body.classList.remove('kbd'), { capture: true, passive: true });
 
   document.addEventListener('keydown', (e) => {
     if (document.querySelector('dialog[open]')) return;
@@ -1221,6 +1233,8 @@
   } else {
     start(null, false);
   }
+  window.__ortieReady = true; // le jeu a démarré (voir le garde-fou dans index.html)
+  try { sessionStorage.removeItem('ortie.autofix'); } catch (e) { /* ignore */ }
   let seen = false;
   try { seen = !!localStorage.getItem(SEEN_KEY); } catch (e) { seen = true; }
   if (!seen && !els.dlgTurn.open) openDialog(els.dlgRules);

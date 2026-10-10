@@ -202,3 +202,18 @@ test('parties complètes aléatoires : dés conservés, fin à 9 cartes ou bloca
     assert.ok(Number.isFinite(H.score(s).total));
   }
 });
+
+test('versions identiques : index.html (?v=), sw.js et app.js', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const pub = path.join(__dirname, '..', 'public');
+  const html = fs.readFileSync(path.join(pub, 'index.html'), 'utf8');
+  const sw = fs.readFileSync(path.join(pub, 'sw.js'), 'utf8');
+  const app = fs.readFileSync(path.join(pub, 'app.js'), 'utf8');
+  const appV = /APP_VERSION = '([^']+)'/.exec(app)[1];
+  const swV = /const VERSION = '([^']+)'/.exec(sw)[1];
+  const htmlV = [...html.matchAll(/(?:style\.css|core\.js|app\.js|install\.js)\?v=([\w.]+)/g)].map((m) => m[1]);
+  assert.strictEqual(htmlV.length, 4);
+  for (const v of htmlV) assert.strictEqual(v, appV);
+  assert.strictEqual(swV, appV);
+});

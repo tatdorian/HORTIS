@@ -3,6 +3,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -24,8 +25,11 @@ const server = http.createServer((req, res) => {
     return res.end();
   }
   let pathname;
+  let versioned = false;
   try {
-    pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
+    const u = new URL(req.url, 'http://localhost');
+    pathname = decodeURIComponent(u.pathname);
+    versioned = u.searchParams.has('v');
   } catch (e) {
     res.writeHead(400);
     return res.end('Bad request');
@@ -46,24 +50,33 @@ const server = http.createServer((req, res) => {
       return res.end('Introuvable');
     }
     const ext = path.extname(file).toLowerCase();
-    const lastModified = st.mtime.toUTCString();
-    const headers = {
-      'Content-Type': TYPES[ext] || 'application/octet-stream',
-      // Code du jeu toujours revalidé (mises à jour immédiates) ; images en cache.
-      'Cache-Control': ext === '.png' ? 'public, max-age=604800' : 'no-cache',
-      'Last-Modified': lastModified,
-      'X-Content-Type-Options': 'nosniff',
-    };
-    if (path.basename(file) === 'sw.js') headers['Service-Worker-Allowed'] = '/';
-    const since = req.headers['if-modified-since'];
-    if (since && Math.floor(st.mtimeMs / 1000) <= Math.floor(Date.parse(since) / 1000)) {
-      res.writeHead(304, headers);
-      return res.end();
-    }
-    headers['Content-Length'] = st.size;
-    res.writeHead(200, headers);
-    if (req.method === 'HEAD') return res.end();
-    fs.createReadStream(file).pipe(res);
+    fs.readFile(file, (rerr, body) => {
+      if (rerr) {
+        res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+        return res.end('Erreur');
+      }
+      // ETag calculé sur le contenu : fiable même si l'hébergeur remet toutes
+      // les dates de fichiers à la même valeur (ce qui faisait garder d'anciens
+      // fichiers au téléphone).
+      const etag = '"' + crypto.createHash('sha1').update(body).digest('base64url').slice(0, 27) + '"';
+      let cache = 'no-cache';
+      if (versioned) cache = 'public, max-age=31536000, immutable'; // style.css?v=…, app.js?v=…
+      else if (ext === '.png') cache = 'public, max-age=604800';
+      const headers = {
+        'Content-Type': TYPES[ext] || 'application/octet-stream',
+        'Cache-Control': cache,
+        ETag: etag,
+        'X-Content-Type-Options': 'nosniff',
+      };
+      if (path.basename(file) === 'sw.js') headers['Service-Worker-Allowed'] = '/';
+      if (req.headers['if-none-match'] === etag) {
+        res.writeHead(304, headers);
+        return res.end();
+      }
+      headers['Content-Length'] = body.length;
+      res.writeHead(200, headers);
+      res.end(req.method === 'HEAD' ? undefined : body);
+    });
   });
 });
 
