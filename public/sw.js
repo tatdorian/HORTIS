@@ -5,7 +5,7 @@
  * toujours le style et le code de sa propre version, jamais un ancien fichier
  * resté en cache.
  */
-const VERSION = '1.21';
+const VERSION = '1.22';
 const CACHE = 'ortie-' + VERSION;
 const ASSETS = [
   './',

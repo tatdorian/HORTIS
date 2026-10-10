@@ -4,7 +4,7 @@
   const H = window.OrtieCore;
   const S = 100; // taille d'une case en unités SVG
   const CW = H.CARD_W * S, CH = H.CARD_H * S;
-  const APP_VERSION = '1.21';
+  const APP_VERSION = '1.22';
   const STORE_KEY = 'ortie.save.v3';
   const OLD_STORE_KEY = 'ortie.save.v2';
   const SEEN_KEY = 'ortie.seenRules';
@@ -1937,6 +1937,8 @@
     el.innerHTML = `🔒 Récompense de l’achievement <b>${a.secret ? 'secret' : '« ' + a.name + ' »'}</b>${a.secret ? '' : ' : ' + a.desc}`;
     el.hidden = false;
     el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+    clearTimeout(lockedHint.timer);
+    lockedHint.timer = setTimeout(() => { el.hidden = true; }, 6000); // l'explication s'efface toute seule
     sfx('bad');
     return true;
   }
