@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-  <title>Ortie — le verger solo</title>
+  <title>Ortie — le verger en 9 cartes</title>
   <meta name="description" content="Ortie : le casse-tête solo du verger en 9 cartes. Superposez les arbres de même essence pour récolter un maximum de fruits.">
   <meta name="theme-color" content="#2f6b3a">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -21,14 +21,14 @@
 </head>
 <body>
   <header class="top">
-    <div class="brand">
-      <svg class="logo" viewBox="0 0 64 64" aria-hidden="true"><use href="#logo-mark"/></svg>
+    <button type="button" class="brand" id="btn-menu" aria-haspopup="dialog" title="Menu : jouer à deux, personnaliser…">
+      <span class="logo-wrap"><svg class="logo" viewBox="0 0 64 64" aria-hidden="true"><use href="#logo-mark"/></svg><span class="menu-badge" aria-hidden="true">☰</span></span>
       <h1>Ortie</h1>
-    </div>
+    </button>
     <div class="chips" aria-label="Avancement">
-      <span class="chip"><b id="turn-label">1</b>/9 cartes</span>
+      <span class="chip turn-chip"><span id="who-chip" class="who" hidden></span><b id="turn-label">1</b>/9 cartes</span>
       <button type="button" id="btn-details" class="chip details-chip" aria-expanded="false" aria-controls="side" title="Score, réserve et recettes">
-        <b id="score-mini">0</b> fruits<span id="obj-mini" class="obj-mini"></span><span id="res-mini" class="res-mini"></span><span class="caret">▾</span>
+        <i id="who-mini" class="who-dot" hidden></i><b id="score-mini">0</b><span class="lbl-fruits">&nbsp;fruits</span><span id="obj-mini" class="obj-mini"></span><span id="res-mini" class="res-mini"></span><span class="caret">▾</span>
       </button>
       <span class="chip seed-chip" title="Même numéro = mêmes cartes (mode compétitif)">Partie n° <b id="seed-label">—</b></span>
     </div>
@@ -45,6 +45,7 @@
       <svg id="board" class="board" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Verger"></svg>
       <div id="toast" class="toast" role="status" aria-live="polite"></div>
       <div class="board-help" id="board-help"></div>
+      <button type="button" id="player-pill" class="player-pill" hidden></button>
     </section>
 
     <div id="side-backdrop" class="side-backdrop"></div>
@@ -54,6 +55,11 @@
         <h2>Détails de la partie <small class="version">v<span class="app-version"></span></small></h2>
         <button type="button" id="btn-side-close" class="btn icon" aria-label="Fermer">✕</button>
       </div>
+      <section id="players" class="panel players-panel" hidden>
+        <h2>Joueurs</h2>
+        <div id="players-list" class="players-list"></div>
+      </section>
+
       <section class="panel score-panel">
         <div class="score-head">
           <div class="score-big"><span id="score-total">0</span><small>fruits</small></div>
@@ -97,6 +103,15 @@
   <dialog id="dlg-new" class="dlg">
     <form method="dialog">
       <h2>Nouvelle partie</h2>
+      <div class="seg" role="radiogroup" aria-label="Mode de jeu">
+        <label><input type="radio" name="mode" value="solo" id="in-mode-solo" checked><span>🌱 Solo</span></label>
+        <label><input type="radio" name="mode" value="duo" id="in-mode-duo"><span>👥 À deux</span></label>
+      </div>
+      <div id="duo-names" class="duo-names" hidden>
+        <label class="field"><span><i class="who-dot p0"></i> Joueur 1</span><input id="in-p1" maxlength="14" autocomplete="off" placeholder="Joueur 1"></label>
+        <label class="field"><span><i class="who-dot p1"></i> Joueur 2</span><input id="in-p2" maxlength="14" autocomplete="off" placeholder="Joueur 2"></label>
+        <small>Mêmes 9 cartes pour les deux, chacun son verger : on joue à tour de rôle sur le même appareil. Le meilleur score gagne (égalité : le plus de dés en jeu).</small>
+      </div>
       <label class="field">Numéro de partie
         <input id="in-seed" name="seed" inputmode="numeric" autocomplete="off" placeholder="au hasard">
         <small>Même numéro = mêmes 9 cartes dans le même ordre. Pratique pour défier un ami.</small>
@@ -111,6 +126,45 @@
         <button value="cancel" class="btn ghost">Annuler</button>
         <button id="btn-start" value="start" class="btn primary">Planter le verger</button>
       </div>
+    </form>
+  </dialog>
+
+  <!-- Menu (logo) -->
+  <dialog id="dlg-menu" class="dlg small menu">
+    <form method="dialog">
+      <div class="menu-head">
+        <svg class="menu-logo" viewBox="0 0 64 64" aria-hidden="true"><use href="#logo-mark"/></svg>
+        <div><h2>Ortie</h2><small class="version">Le verger en 9 cartes · v<span class="app-version"></span></small></div>
+        <button value="close" class="btn icon" aria-label="Fermer">✕</button>
+      </div>
+      <div class="menu-list">
+        <button value="solo" class="menu-item"><span class="mi-ico" style="--c:#3f8f3a">🌱</span><span class="mi-txt"><b>Partie solo</b><small>Battez votre record en 9 cartes</small></span></button>
+        <button value="duo" class="menu-item"><span class="mi-ico" style="--c:#3b7fc4">👥</span><span class="mi-txt"><b>Jouer à deux</b><small>Mêmes cartes, chacun son verger, à tour de rôle</small></span></button>
+        <button value="custom" class="menu-item"><span class="mi-ico" style="--c:#d9822b">🎨</span><span class="mi-txt"><b>Personnaliser</b><small>Fond du terrain et design des cartes</small></span></button>
+        <button value="rules" class="menu-item"><span class="mi-ico" style="--c:#8a6bc4">📖</span><span class="mi-txt"><b>Règles du jeu</b><small>Comment jouer, raccourcis</small></span></button>
+        <a href="#" class="menu-item install-link" id="menu-install" hidden><span class="mi-ico" style="--c:#2f6b3a">⬇</span><span class="mi-txt"><b>Installer l’appli</b><small>iPhone, Android, ordinateur</small></span></a>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Personnalisation -->
+  <dialog id="dlg-custom" class="dlg custom">
+    <form method="dialog">
+      <h2>Personnaliser</h2>
+      <h3>Fond du terrain</h3>
+      <div id="opt-boards" class="opt-grid boards"></div>
+      <h3>Design des cartes</h3>
+      <div id="opt-cards" class="opt-grid cards"></div>
+      <p class="small-note">Vos choix sont gardés sur cet appareil.</p>
+      <div class="dlg-actions"><button value="ok" class="btn primary">Terminé</button></div>
+    </form>
+  </dialog>
+
+  <!-- Changement de joueur -->
+  <dialog id="dlg-turn" class="dlg small turn">
+    <form method="dialog">
+      <div id="turn-body"></div>
+      <div class="dlg-actions"><button value="ok" class="btn primary" id="btn-turn-go">C’est parti !</button></div>
     </form>
   </dialog>
 
@@ -178,6 +232,10 @@
         <p>Une fois par partie, il permet de recouvrir une autre essence. Le dé recouvert retourne à la réserve et l’arbre ne pourra plus être recouvert.</p>
         <h3>Fin de partie</h3>
         <p>Après la 9<sup>e</sup> carte (ou si plus aucune carte ne peut être posée), additionnez les dés posés sur des arbres. S’il n’y a plus de dé de la bonne couleur en réserve, on n’en place pas.</p>
+        <h3>À deux, sur le même appareil</h3>
+        <p>Touchez le logo en haut à gauche, puis <b>« Jouer à deux »</b>. Les deux joueurs reçoivent les mêmes 9 cartes et construisent chacun leur verger, à tour de rôle : on se passe l’appareil à chaque carte posée. Le meilleur score gagne ; en cas d’égalité, celui qui a le plus de dés en jeu.</p>
+        <h3>Personnaliser</h3>
+        <p>Logo en haut à gauche → <b>« Personnaliser »</b> : choisissez le fond du terrain et le design des cartes.</p>
         <h3>Recettes</h3>
         <p>Au verso des cartes. Avec deux Recettes, additionnez leurs nombres : c’est votre objectif. Leur bonus s’ajoute si la condition est remplie en fin de partie. Les cartes Recette ne font pas partie de la pioche.</p>
         <h3>Raccourcis</h3>

@@ -1,5 +1,5 @@
 /* Ortie — service worker : fonctionne hors connexion une fois installé. */
-const CACHE = 'ortie-v8';
+const CACHE = 'ortie-v9';
 const ASSETS = [
   './',
   'index.html',

@@ -4,9 +4,32 @@
   const H = window.OrtieCore;
   const S = 100; // taille d'une case en unités SVG
   const CW = H.CARD_W * S, CH = H.CARD_H * S;
-  const APP_VERSION = '1.7';
-  const STORE_KEY = 'ortie.save.v2';
+  const APP_VERSION = '1.8';
+  const STORE_KEY = 'ortie.save.v3';
+  const OLD_STORE_KEY = 'ortie.save.v2';
   const SEEN_KEY = 'ortie.seenRules';
+  const PREFS_KEY = 'ortie.prefs';
+
+  // Design des cartes (prairie + buissons). Les fruits gardent toujours leurs couleurs.
+  const CARD_THEMES = {
+    classic: { name: 'Classique', base: '#9acd47', blobs: ['#a6d653', '#8ec23f', '#a3d250', '#8fc341', '#a9d958'], star: '#f4e45a', dot: '#f39b84', border: '#6c9f2f', hi: '#c6ea7d', num: '#2b6a2b',
+      bush: { back: '#1d5527', l1: '#2c7a36', l2: '#3a8c3e', l3: '#4b9f45', stroke: '#17451f', r1: '#78b866', r2: '#8cc874', r3: '#a2d688' } },
+    spring: { name: 'Printemps', base: '#bfe58a', blobs: ['#cdeda0', '#b1db76', '#c8ea96', '#b6df7e', '#d6f2ad'], star: '#ffffff', dot: '#f27aa6', border: '#8dbd52', hi: '#eefad8', num: '#3d7a2f',
+      bush: { back: '#2a6a31', l1: '#3c8f44', l2: '#4fa453', l3: '#69bb62', stroke: '#1f5226', r1: '#9bd68c', r2: '#b2e3a0', r3: '#c8edb8' } },
+    autumn: { name: 'Automne', base: '#dcb45a', blobs: ['#e5c26b', '#d0a549', '#e0bb62', '#c99c43', '#ead07c'], star: '#fff4b8', dot: '#c2502a', border: '#a8823a', hi: '#f5e2a6', num: '#7a4a14',
+      bush: { back: '#3b4f1e', l1: '#55702a', l2: '#6a8534', l3: '#82993f', stroke: '#283612', r1: '#a7bb6a', r2: '#b9c97e', r3: '#cbd893' } },
+    night: { name: 'Nuit', base: '#2c5a49', blobs: ['#346753', '#275243', '#31624f', '#244c3e', '#3a6f59'], star: '#ffe86f', dot: '#8fd0ff', border: '#173a2e', hi: '#5c977d', num: '#dff3c8',
+      bush: { back: '#0f3020', l1: '#1d4f31', l2: '#26603c', l3: '#31744a', stroke: '#08200f', r1: '#5f9e72', r2: '#74b285', r3: '#8cc69a' } },
+    winter: { name: 'Hiver', base: '#e2eef1', blobs: ['#f3f9fa', '#d2e3e8', '#ebf4f6', '#d8e7eb', '#f8fcfc'], star: '#ffffff', dot: '#93bfd2', border: '#a6c2cc', hi: '#ffffff', num: '#2e5a6b',
+      bush: { back: '#1c473a', l1: '#2a644f', l2: '#357860', l3: '#468d72', stroke: '#133429', r1: '#8fc9b4', r2: '#a6d6c4', r3: '#c0e5d6' } },
+  };
+  const BOARDS = { oak: 'Chêne clair', walnut: 'Noyer', felt: 'Tapis bleu', linen: 'Lin', slate: 'Ardoise', terracotta: 'Tomettes' };
+  const PLAYER_COLORS = ['#f06a32', '#3b7fc4'];
+  const prefs = { board: 'oak', cards: 'classic', names: ['', ''] };
+  try { Object.assign(prefs, JSON.parse(localStorage.getItem(PREFS_KEY) || '{}')); } catch (e) { /* ignore */ }
+  if (!BOARDS[prefs.board]) prefs.board = 'oak';
+  if (!CARD_THEMES[prefs.cards]) prefs.cards = 'classic';
+  function savePrefs() { try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch (e) { /* ignore */ } }
 
   const COLOR = { orange: '#f06a32', citron: '#f4cf22', vert: '#5fbf4a' };
   const INK = { orange: '#d4511f', citron: '#b38900', vert: '#3d8a2f', none: '#2f5a35' };
@@ -28,11 +51,22 @@
     dlgNew: $('dlg-new'), dlgEnd: $('dlg-end'), dlgRules: $('dlg-rules'), dlgSquirrel: $('dlg-squirrel'),
     inSeed: $('in-seed'), inRecipes: $('in-recipes'), inR1: $('in-r1'), inR2: $('in-r2'), recipePick: $('recipe-pick'),
     endTitle: $('end-title'), endBody: $('end-body'), legend: $('legend'), defs: $('defs'),
+    btnMenu: $('btn-menu'), dlgMenu: $('dlg-menu'), menuInstall: $('menu-install'),
+    dlgCustom: $('dlg-custom'), optBoards: $('opt-boards'), optCards: $('opt-cards'),
+    dlgTurn: $('dlg-turn'), turnBody: $('turn-body'),
+    inModeSolo: $('in-mode-solo'), inModeDuo: $('in-mode-duo'), duoNames: $('duo-names'), inP1: $('in-p1'), inP2: $('in-p2'),
+    players: $('players'), playersList: $('players-list'), playerPill: $('player-pill'), whoChip: $('who-chip'), whoMini: $('who-mini'),
   };
 
+  // match.players[i].state est un état de partie du moteur ; `state` désigne
+  // toujours celui du joueur affiché.
+  let match = null;
   let state = null;
   let history = [];
-  const ui = { sel: null, rot: 0, pos: null, anchor: null, spin: null, lastTap: null, lastHandTap: null, drag: null, handDrag: null, dragEndAt: -1e9, fresh: null, popKeys: [], view: null, endShown: false };
+  const isDuo = () => !!match && match.mode === 'duo';
+  const curPlayer = () => match.players[match.cur];
+  function syncState() { state = match.players[match.cur].state; }
+  const ui = { locked: false, sel: null, rot: 0, pos: null, anchor: null, spin: null, lastTap: null, lastHandTap: null, drag: null, handDrag: null, dragEndAt: -1e9, fresh: null, popKeys: [], view: null, endShown: false };
 
   // ------------------------------------------------------------- Graphismes
   // Buisson en rosette de feuilles, comme sur les cartes.
@@ -41,31 +75,33 @@
       const a = r0 + (r1 - r0) * 0.35, b = r0 + (r1 - r0) * 0.8;
       return `M0 ${-r0}C${w} ${-a} ${w * 0.75} ${-b} 0 ${-r1}C${-w * 0.75} ${-b} ${-w} ${-a} 0 ${-r0}Z`;
     };
-    const ring = (n, off, r0, r1, w, fill, rib) => {
+    const ring = (n, off, r0, r1, w, fill, rib, stroke) => {
       let s = '';
       for (let i = 0; i < n; i++) {
         const ang = off + (i * 360) / n;
-        s += `<g transform="rotate(${ang.toFixed(1)})"><path d="${leaf(r0, r1, w)}" fill="${fill}" stroke="#17451f" stroke-width="1.1"/><path d="M0 ${-r0 - 2}L0 ${-r1 + 4}" stroke="${rib}" stroke-width="1" opacity=".55"/></g>`;
+        s += `<g transform="rotate(${ang.toFixed(1)})"><path d="${leaf(r0, r1, w)}" fill="${fill}" stroke="${stroke}" stroke-width="1.1"/><path d="M0 ${-r0 - 2}L0 ${-r1 + 4}" stroke="${rib}" stroke-width="1" opacity=".55"/></g>`;
       }
       return s;
     };
-    let bush = '<g id="bush"><circle r="38" fill="#1d5527"/>';
-    bush += ring(17, 0, 16, 45, 10.5, '#2c7a36', '#78b866');
-    bush += ring(13, 12, 9, 35, 10, '#3a8c3e', '#8cc874');
-    bush += ring(9, 5, 3, 24, 8.5, '#4b9f45', '#a2d688');
-    bush += '<circle r="9" fill="#3a8c3e"/></g>';
-
-    // Prairie mouchetée (fleurs jaunes et pétales roses)
-    let pat = '<pattern id="p-meadow" width="64" height="64" patternUnits="userSpaceOnUse">';
-    pat += '<rect width="64" height="64" fill="#9acd47"/>';
-    const blobs = [[8, 12, 9, '#a6d653'], [40, 6, 7, '#8ec23f'], [30, 34, 10, '#a3d250'], [54, 44, 8, '#8fc341'], [12, 50, 7, '#a9d958']];
-    for (const [x, y, r, c] of blobs) pat += `<circle cx="${x}" cy="${y}" r="${r}" fill="${c}" opacity=".7"/>`;
-    const star = (x, y, s) => `<path transform="translate(${x} ${y}) scale(${s})" d="M0-4L1-1L4 0L1 1L0 4L-1 1L-4 0L-1-1Z" fill="#f4e45a"/>`;
-    pat += star(6, 6, 0.8) + star(26, 18, 0.6) + star(48, 26, 0.8) + star(18, 40, 0.7) + star(58, 58, 0.6) + star(38, 54, 0.75);
-    const dots = [[14, 26], [34, 10], [52, 14], [44, 40], [6, 36], [26, 58], [60, 32]];
-    for (const [x, y] of dots) pat += `<circle cx="${x}" cy="${y}" r="1.3" fill="#f39b84"/>`;
-    pat += '</pattern>';
-    els.defs.insertAdjacentHTML('beforeend', bush + pat);
+    const star = (x, y, sc, c) => `<path transform="translate(${x} ${y}) scale(${sc})" d="M0-4L1-1L4 0L1 1L0 4L-1 1L-4 0L-1-1Z" fill="${c}"/>`;
+    let out = '';
+    for (const [id, T] of Object.entries(CARD_THEMES)) {
+      // Buisson en rosette de feuilles, comme sur les cartes
+      const B = T.bush;
+      out += `<g id="bush-${id}"><circle r="38" fill="${B.back}"/>`;
+      out += ring(17, 0, 16, 45, 10.5, B.l1, B.r1, B.stroke);
+      out += ring(13, 12, 9, 35, 10, B.l2, B.r2, B.stroke);
+      out += ring(9, 5, 3, 24, 8.5, B.l3, B.r3, B.stroke);
+      out += `<circle r="9" fill="${B.l2}"/></g>`;
+      // Prairie mouchetée (fleurs et pétales)
+      out += `<pattern id="p-meadow-${id}" width="64" height="64" patternUnits="userSpaceOnUse"><rect width="64" height="64" fill="${T.base}"/>`;
+      [[8, 12, 9], [40, 6, 7], [30, 34, 10], [54, 44, 8], [12, 50, 7]].forEach(([x, y, r], i) => { out += `<circle cx="${x}" cy="${y}" r="${r}" fill="${T.blobs[i]}" opacity=".7"/>`; });
+      out += star(6, 6, 0.8, T.star) + star(26, 18, 0.6, T.star) + star(48, 26, 0.8, T.star) + star(18, 40, 0.7, T.star) + star(58, 58, 0.6, T.star) + star(38, 54, 0.75, T.star);
+      for (const [x, y] of [[14, 26], [34, 10], [52, 14], [44, 40], [6, 36], [26, 58], [60, 32]]) out += `<circle cx="${x}" cy="${y}" r="1.3" fill="${T.dot}"/>`;
+      out += '</pattern>';
+    }
+    out += '<g id="bush"><use href="#bush-classic"/></g>';
+    els.defs.insertAdjacentHTML('beforeend', out);
   }
 
   function fruitsSvg(cell) {
@@ -73,19 +109,22 @@
     return cell.f === 2 ? use(-10, -9, 0.95) + use(10, 9, 0.95) : use(0, 0, 1.05);
   }
 
-  function cellSvg(cell, cx, cy, cardId) {
+  function cellSvg(cell, cx, cy, cardId, theme) {
+    const th = theme || prefs.cards;
     if (cell.k === 'tree') {
-      return `<g transform="translate(${cx} ${cy})"><use href="#bush" filter="url(#f-soft)"/>${fruitsSvg(cell)}</g>`;
+      return `<g transform="translate(${cx} ${cy})"><use href="#bush-${th}" filter="url(#f-soft)"/>${fruitsSvg(cell)}</g>`;
     }
-    return `<text x="${cx}" y="${cy}" transform="rotate(-90 ${cx} ${cy})" dy="8" text-anchor="middle" class="card-num">${cardId}</text>`;
+    return `<text x="${cx}" y="${cy}" transform="rotate(-90 ${cx} ${cy})" dy="8" text-anchor="middle" class="card-num" fill="${CARD_THEMES[th].num}">${cardId}</text>`;
   }
 
   // Carte dans son orientation de base (300 × 200), coin haut-gauche en (0,0).
-  function cardArt(card) {
-    let g = `<rect x="2" y="2" width="${CW - 4}" height="${CH - 4}" rx="14" fill="url(#p-meadow)" stroke="#6c9f2f" stroke-width="2.5"/>`;
-    g += `<rect x="6" y="6" width="${CW - 12}" height="${CH - 12}" rx="11" fill="none" stroke="#c6ea7d" stroke-width="1.5" opacity=".6"/>`;
+  function cardArt(card, theme) {
+    const th = theme || prefs.cards;
+    const T = CARD_THEMES[th];
+    let g = `<rect x="2" y="2" width="${CW - 4}" height="${CH - 4}" rx="14" fill="url(#p-meadow-${th})" stroke="${T.border}" stroke-width="2.5"/>`;
+    g += `<rect x="6" y="6" width="${CW - 12}" height="${CH - 12}" rx="11" fill="none" stroke="${T.hi}" stroke-width="1.5" opacity=".6"/>`;
     card.cells.forEach((cell, i) => {
-      g += cellSvg(cell, (i % H.CARD_W) * S + S / 2, Math.floor(i / H.CARD_W) * S + S / 2, card.id);
+      g += cellSvg(cell, (i % H.CARD_W) * S + S / 2, Math.floor(i / H.CARD_W) * S + S / 2, card.id, th);
     });
     return g;
   }
@@ -316,7 +355,7 @@
     let msg, cls = '';
     if (state.over) msg = 'Partie terminée. Lancez une nouvelle partie quand vous voulez.';
     else if (!sel) msg = state.placed.length === 1 ? 'Choisissez une carte de votre main pour commencer.' : 'Choisissez votre prochaine carte.';
-    else if (!ev) msg = 'Placez la carte sur le verger.';
+    else if (!ev) msg = touchMode() ? 'Touchez le verger (ou glissez la carte) pour la placer.' : 'Survolez le verger pour placer la carte.';
     else if (ev.ok) {
       if (ev.usesSquirrel) msg = 'Possible avec l’Écureuil (une seule fois par partie).';
       else msg = touchMode() ? 'Pose valide : touchez « Poser ».' : 'Pose valide : cliquez pour poser.';
@@ -325,7 +364,8 @@
     } else { msg = ev.reason; cls = 'bad'; }
     els.hint.textContent = msg;
     els.hint.className = 'hint ' + cls;
-    els.boardHelp.textContent = sel ? (touchMode() ? 'Glissez la carte du doigt · touchez 2 fois pour tourner' : 'Survolez pour déplacer · molette pour tourner · clic pour poser') : '';
+    els.boardHelp.textContent = !sel ? '' : !ui.pos ? (touchMode() ? 'Touchez le verger pour y placer la carte' : 'Survolez le verger pour placer la carte')
+      : (touchMode() ? 'Glissez la carte du doigt · touchez 2 fois pour tourner' : 'Survolez pour déplacer · molette pour tourner · clic pour poser');
     els.boardHelp.classList.toggle('show', sel);
     fitTexts();
   }
@@ -462,6 +502,43 @@
     } else els.recipes.hidden = true;
 
     els.btnUndo.disabled = history.length === 0;
+    renderPlayers();
+  }
+
+  function renderPlayers() {
+    const duo = isDuo();
+    document.body.classList.toggle('duo', duo);
+    els.players.hidden = !duo;
+    els.playerPill.hidden = !duo;
+    els.whoChip.hidden = !duo;
+    els.whoMini.hidden = !duo;
+    if (!duo) return;
+    const vi = viewedIndex();
+    const vp = match.players[vi];
+    const over = allOver();
+    els.whoChip.innerHTML = `<i class="who-dot" style="background:${vp.color}"></i>${esc(vp.name)} · `;
+    els.whoMini.style.background = vp.color;
+    const n = Math.min(vp.state.placed.length + (vp.state.over ? 0 : 1), H.GAME_CARDS);
+    els.playerPill.innerHTML = `<i class="who-dot" style="background:${vp.color}"></i><b>${esc(vp.name)}</b><span>${over ? 'voir l’autre verger ⇄' : vp.state.over ? 'terminé' : 'carte ' + n + '/' + H.GAME_CARDS}</span>`;
+    els.playerPill.classList.toggle('can-switch', over);
+    els.playerPill.style.setProperty('--pc', vp.color);
+    els.playersList.innerHTML = match.players.map((p, i) => {
+      const sc = H.score(p.state);
+      const cards = Math.min(p.state.placed.length, H.GAME_CARDS);
+      const tag = over ? (i === vi ? 'affiché' : 'voir') : p.state.over ? 'terminé' : i === match.cur ? 'à jouer' : '';
+      return `<button type="button" class="pl${i === vi ? ' on' : ''}" data-player="${i}" ${over ? '' : 'disabled'}><i class="who-dot" style="background:${p.color}"></i><span class="pl-name">${esc(p.name)}</span><span class="pl-tag">${tag}</span><span class="pl-cards">${cards}/${H.GAME_CARDS}</span><b>${sc.total}</b></button>`;
+    }).join('');
+  }
+
+  // Fin de partie à deux : on peut regarder le verger de chaque joueur.
+  function viewPlayer(i) {
+    if (!isDuo() || !allOver() || i === viewedIndex()) return;
+    match.cur = i;
+    syncState();
+    ui.sel = null; ui.pos = null;
+    computeView();
+    save();
+    renderAll();
   }
 
   function renderAll() {
@@ -472,22 +549,19 @@
   }
 
   // ------------------------------------------------------------ Interactions
+  // Choisir une carte ne la pose pas sur le verger : elle n'apparaît que là où
+  // le joueur touche, glisse ou survole le plateau.
   function selectCard(id) {
-    if (state.over) return;
+    if (state.over || ui.locked) return;
     if (ui.sel === id) { ui.sel = null; ui.pos = null; }
-    else {
-      ui.sel = id;
-      const m = H.bestMove(state, [id]);
-      if (m) { ui.rot = m.rot; ui.pos = { x: m.x, y: m.y }; }
-      else { ui.rot = 0; ui.pos = null; }
-    }
+    else { ui.sel = id; ui.rot = 0; ui.pos = null; ui.anchor = null; }
     renderHand();
     renderGhost();
   }
 
   // Glisser une carte de la main directement sur le plateau (doigt ou souris).
   function startHandDrag(e, id) {
-    if (state.over || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    if (state.over || ui.locked || (e.pointerType === 'mouse' && e.button !== 0)) return;
     lastPointerType = e.pointerType;
     ui.handDrag = { id, pointerId: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
     try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
@@ -503,12 +577,7 @@
       if (Math.hypot(pt.clientX - d.x, pt.clientY - d.y) < 10) return;
       d.moved = true;
       document.body.classList.add('dragging');
-      if (ui.sel !== d.id) {
-        ui.sel = d.id;
-        const m = H.bestMove(state, [d.id]);
-        ui.rot = m ? m.rot : 0;
-        ui.pos = null;
-      }
+      if (ui.sel !== d.id) { ui.sel = d.id; ui.rot = 0; ui.pos = null; ui.anchor = null; }
       // pas de re-rendu de la main pendant le geste (l'élément touché doit rester en place)
       for (const btn of els.hand.querySelectorAll('.hand-card')) btn.classList.toggle('selected', btn.getAttribute('aria-label') === 'Carte n°' + d.id);
     }
@@ -564,7 +633,7 @@
   }
 
   function suggest() {
-    if (state.over) return;
+    if (state.over || ui.locked) return;
     const m = H.bestMove(state, ui.sel != null ? [ui.sel] : state.hand);
     if (!m) { toast('Aucune pose possible avec cette carte.', 'bad'); return; }
     ui.sel = m.id; ui.rot = m.rot; ui.pos = { x: m.x, y: m.y };
@@ -640,12 +709,22 @@
       if (ghost) { ghost.classList.remove('shake'); void ghost.getBBox(); ghost.classList.add('shake'); }
       return;
     }
-    if (ev.usesSquirrel) { els.dlgSquirrel.showModal(); return; }
+    if (ev.usesSquirrel) { openDialog(els.dlgSquirrel); return; }
     doPlace(false);
   }
 
+  const allOver = () => match.players.every((p) => p.state.over);
+  const viewedIndex = () => Math.max(0, match.players.findIndex((p) => p.state === state));
+  const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  function openDialog(d) {
+    d.returnValue = ''; // sinon Échap rejouerait le dernier choix (ex. « Planter le verger »)
+    if (!d.open) d.showModal();
+  }
+
   function doPlace(withSquirrel) {
-    const before = JSON.stringify(state);
+    if (ui.locked) return;
+    const before = JSON.stringify(match);
     const res = H.play(state, ui.sel, ui.rot, ui.pos.x, ui.pos.y, { allowSquirrel: withSquirrel });
     if (!res.ok) { toast(res.reason, 'bad'); return; }
     history.push(before);
@@ -659,20 +738,61 @@
     ui.fresh = true;
     ui.sel = null; ui.pos = null;
     computeView(true);
+    // À deux : on passe la main à l'autre joueur s'il lui reste des cartes.
+    let next = match.cur;
+    if (isDuo() && !match.players[1 - match.cur].state.over) next = 1 - match.cur;
+    const switching = next !== match.cur;
+    if (switching) { match.cur = next; ui.locked = true; } // le coup reste affiché un instant
     save();
     renderAll();
-    if (state.over) setTimeout(showEnd, 650);
+    clearTimeout(ui.turnTimer);
+    if (switching) ui.turnTimer = setTimeout(showTurn, 800);
+    else if (allOver()) ui.turnTimer = setTimeout(showEnd, 650);
+  }
+
+  // Écran « À X de jouer » (on se passe l'appareil).
+  function showTurn() {
+    const p = curPlayer();
+    const prev = match.players[1 - match.cur];
+    const sc = H.score(p.state);
+    let h = `<div class="turn-head"><span class="big-dot" style="background:${p.color}"></span><div><h2>À ${esc(p.name)} de jouer !</h2>`;
+    h += `<p>${p.state.placed.length <= 1 ? 'Premier coup' : 'Carte ' + Math.min(p.state.placed.length + 1, H.GAME_CARDS) + '/' + H.GAME_CARDS} · ${sc.total} fruits</p></div></div>`;
+    if (prev.state.over) h += `<p class="note">Le verger de ${esc(prev.name)} est terminé (${H.score(prev.state).total} fruits) : ${esc(p.name)} joue ses dernières cartes.</p>`;
+    h += scoreboardHtml();
+    els.turnBody.innerHTML = h;
+    openDialog(els.dlgTurn);
+  }
+
+  function scoreboardHtml() {
+    return '<div class="mini-board">' + match.players.map((p, i) => {
+      const sc = H.score(p.state);
+      const n = Math.min(p.state.placed.length, H.GAME_CARDS);
+      return `<div class="mb-row${i === match.cur && !allOver() ? ' on' : ''}"><i class="who-dot" style="background:${p.color}"></i><span class="mb-name">${esc(p.name)}</span><span class="mb-cards">${n}/${H.GAME_CARDS}</span><b>${sc.total}</b></div>`;
+    }).join('') + '</div>';
+  }
+
+  function afterTurnDialog() {
+    if (ui.skipTurnClose) { ui.skipTurnClose = false; return; }
+    ui.locked = false;
+    syncState();
+    ui.sel = null; ui.pos = null; ui.fresh = false;
+    computeView();
+    renderAll();
   }
 
   function undo() {
     if (!history.length) return;
-    state = JSON.parse(history.pop());
+    clearTimeout(ui.turnTimer);
+    if (els.dlgTurn.open) { ui.skipTurnClose = true; els.dlgTurn.close(); }
+    match = JSON.parse(history.pop());
+    syncState();
+    ui.locked = false;
     ui.sel = null; ui.pos = null; ui.endShown = false;
     if (els.dlgEnd.open) els.dlgEnd.close();
     computeView();
     save();
     renderAll();
-    toast('Coup annulé.');
+    toast(isDuo() ? `Coup annulé · à ${curPlayer().name} de jouer.` : 'Coup annulé.');
   }
 
   let toastTimer = null;
@@ -686,6 +806,7 @@
   function showEnd() {
     if (ui.endShown) return;
     ui.endShown = true;
+    if (isDuo()) { showDuoEnd(); return; }
     const sc = H.score(state);
     els.endTitle.textContent = state.endReason === 'blocked' ? 'Le verger est bloqué !' : 'Récolte terminée !';
     let b = '';
@@ -707,7 +828,32 @@
     b += '<button type="button" id="btn-share" class="btn ghost share">Copier le défi pour un ami</button>';
     els.endBody.innerHTML = b;
     $('btn-share').addEventListener('click', () => share(sc));
-    els.dlgEnd.showModal();
+    openDialog(els.dlgEnd);
+  }
+
+  function showDuoEnd() {
+    const rows = match.players.map((p, i) => ({ p, i, sc: H.score(p.state) }));
+    const [a, b] = rows;
+    let win = null, byDice = false;
+    if (a.sc.total !== b.sc.total) win = a.sc.total > b.sc.total ? a : b;
+    else if (a.sc.dice !== b.sc.dice) { win = a.sc.dice > b.sc.dice ? a : b; byDice = true; }
+    els.endTitle.textContent = win ? `Victoire de ${win.p.name} !` : 'Égalité parfaite !';
+    let h = '<div class="duo-end">';
+    for (const r of rows) {
+      const sc = r.sc;
+      h += `<div class="duo-col${win && win.i === r.i ? ' win' : ''}" style="--pc:${r.p.color}">`;
+      h += `<div class="duo-name"><i class="who-dot" style="background:${r.p.color}"></i>${esc(r.p.name)}${win && win.i === r.i ? ' 🏆' : ''}</div>`;
+      h += `<div class="duo-score">${sc.total}<small> fruits</small></div>`;
+      h += '<div class="duo-detail">' + H.TYPES.map((t) => `<span><i class="dot" style="background:${DIE_FILL[t]}"></i>${sc.scored[t]}</span>`).join('') + '</div>';
+      h += `<div class="duo-sub">${sc.dice} dé(s) en jeu${sc.bonus ? ' · bonus +' + sc.bonus : ''}${sc.lost ? ' · ' + sc.lost + ' pourris' : ''}</div>`;
+      if (sc.target != null) h += `<div class="duo-sub">${sc.won ? '✔ objectif ' + sc.target + ' atteint' : '✘ objectif ' + sc.target}</div>`;
+      h += '</div>';
+    }
+    h += '</div>';
+    if (byDice) h += '<p class="small-note">Égalité de fruits : la victoire va à celui qui a le plus de dés en jeu.</p>';
+    h += `<p class="small-note">Partie n° <b>${esc(state.seed)}</b> · mêmes cartes pour les deux joueurs. Touchez le nom d’un joueur (en haut du verger) pour voir son verger.</p>`;
+    els.endBody.innerHTML = h;
+    openDialog(els.dlgEnd);
   }
 
   function shareUrl() {
@@ -727,31 +873,55 @@
     } catch (e) { window.prompt('Copiez ce texte :', txt); }
   }
 
-  function start(seed, recipes) {
-    state = H.newGame(seed || H.randomSeed(), { recipes });
+  function start(seed, recipes, mode, names) {
+    mode = mode === 'duo' ? 'duo' : 'solo';
+    seed = String(seed || H.randomSeed());
+    const mk = () => H.newGame(seed, { recipes });
+    match = {
+      mode,
+      cur: 0,
+      players: mode === 'duo'
+        ? [0, 1].map((i) => ({ name: (names && names[i]) || 'Joueur ' + (i + 1), color: PLAYER_COLORS[i], state: mk() }))
+        : [{ name: 'Vous', color: PLAYER_COLORS[0], state: mk() }],
+    };
+    syncState();
     history = [];
+    clearTimeout(ui.turnTimer);
+    ui.locked = false;
     ui.sel = null; ui.pos = null; ui.rot = 0; ui.endShown = false; ui.fresh = true;
     computeView();
     save();
     renderAll();
     try { if (location.search) window.history.replaceState(null, '', location.pathname); } catch (e) { /* ignore */ }
+    if (mode === 'duo') showTurn();
   }
 
   function save() {
-    try { localStorage.setItem(STORE_KEY, JSON.stringify({ state, history: history.slice(-15) })); } catch (e) { /* stockage indisponible */ }
+    try { localStorage.setItem(STORE_KEY, JSON.stringify({ match, history: history.slice(-15) })); } catch (e) { /* stockage indisponible */ }
   }
+  const validState = (st) => st && st.board && Array.isArray(st.placed) && Array.isArray(st.hand);
   function load() {
     try {
       const d = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
-      if (!d || !d.state || !d.state.board || !Array.isArray(d.state.placed)) return false;
-      state = d.state; history = d.history || [];
+      if (d && d.match && Array.isArray(d.match.players) && d.match.players.length && d.match.players.every((p) => validState(p.state))) {
+        match = d.match;
+        history = Array.isArray(d.history) ? d.history : [];
+      } else {
+        // ancienne sauvegarde (solo)
+        const o = JSON.parse(localStorage.getItem(OLD_STORE_KEY) || 'null');
+        if (!o || !validState(o.state)) return false;
+        match = { mode: 'solo', cur: 0, players: [{ name: 'Vous', color: PLAYER_COLORS[0], state: o.state }] };
+        history = [];
+      }
+      if (!(match.cur >= 0 && match.cur < match.players.length)) match.cur = 0;
+      syncState();
       return true;
     } catch (e) { return false; }
   }
 
   // ---------------------------------------------------- Légende des règles
   function renderLegend() {
-    const tile = (inner, label) => `<figure><svg viewBox="0 0 100 100"><rect x="2" y="2" width="96" height="96" rx="14" fill="url(#p-meadow)"/>${inner}</svg><figcaption>${label}</figcaption></figure>`;
+    const tile = (inner, label) => `<figure><svg viewBox="0 0 100 100"><rect x="2" y="2" width="96" height="96" rx="14" fill="url(#p-meadow-${prefs.cards})"/>${inner}</svg><figcaption>${label}</figcaption></figure>`;
     let h = '';
     h += tile(cellSvg({ k: 'tree', t: 'orange', f: 1 }, 50, 50), 'Oranger · 1 fruit');
     h += tile(cellSvg({ k: 'tree', t: 'citron', f: 2 }, 50, 50), 'Citronnier · 2 fruits');
@@ -790,6 +960,7 @@
 
   // Doigt : glisser = déplacer la carte, toucher = l'amener ici, double toucher = tourner.
   els.boardWrap.addEventListener('touchstart', (e) => {
+    if (e.target.closest && e.target.closest('.player-pill')) return;
     noteTouch();
     if (e.cancelable) e.preventDefault();
     if (e.touches.length > 1) { ui.drag = null; return; }
@@ -800,6 +971,7 @@
     ui.drag = { id: t.identifier, start: p, startPos: ui.pos ? Object.assign({}, ui.pos) : centerAt(p), moved: false, sx: t.clientX, sy: t.clientY };
   }, { passive: false });
   els.boardWrap.addEventListener('touchmove', (e) => {
+    if (e.target.closest && e.target.closest('.player-pill')) return;
     if (e.cancelable) e.preventDefault();
     const d = ui.drag;
     if (!d) return;
@@ -811,6 +983,7 @@
     if (p) setPos({ x: d.startPos.x + Math.round(p.x - d.start.x), y: d.startPos.y + Math.round(p.y - d.start.y) });
   }, { passive: false });
   els.boardWrap.addEventListener('touchend', (e) => {
+    if (e.target.closest && e.target.closest('.player-pill')) return;
     noteTouch();
     if (e.cancelable) e.preventDefault();
     const d = ui.drag;
@@ -896,15 +1069,23 @@
   els.btnPlace.addEventListener('click', tryPlace);
   els.btnHint.addEventListener('click', suggest);
   els.btnUndo.addEventListener('click', undo);
-  els.btnRules.addEventListener('click', () => els.dlgRules.showModal());
-  els.btnNew.addEventListener('click', () => {
+  els.btnRules.addEventListener('click', () => openDialog(els.dlgRules));
+
+  function openNew(mode) {
     els.inSeed.value = '';
     els.inRecipes.checked = !!state.recipes;
     els.recipePick.hidden = !els.inRecipes.checked;
     els.inR1.value = ''; els.inR2.value = '';
-    els.dlgNew.showModal();
-  });
+    (mode === 'duo' ? els.inModeDuo : els.inModeSolo).checked = true;
+    els.duoNames.hidden = mode !== 'duo';
+    const names = isDuo() ? match.players.map((p) => p.name) : prefs.names;
+    els.inP1.value = (names && names[0]) || '';
+    els.inP2.value = (names && names[1]) || '';
+    openDialog(els.dlgNew);
+  }
+  els.btnNew.addEventListener('click', () => openNew(match.mode));
   els.inRecipes.addEventListener('change', () => { els.recipePick.hidden = !els.inRecipes.checked; });
+  for (const r of [els.inModeSolo, els.inModeDuo]) r.addEventListener('change', () => { els.duoNames.hidden = !els.inModeDuo.checked; });
   els.dlgNew.addEventListener('close', () => {
     if (els.dlgNew.returnValue !== 'start') return;
     let rec = false;
@@ -912,15 +1093,63 @@
       const picks = [els.inR1.value, els.inR2.value].filter(Boolean).map(Number);
       rec = picks.length ? Array.from(new Set(picks)) : true;
     }
-    start(els.inSeed.value.trim(), rec);
+    const mode = els.inModeDuo.checked ? 'duo' : 'solo';
+    const names = [els.inP1.value.trim(), els.inP2.value.trim()];
+    if (mode === 'duo') { prefs.names = names; savePrefs(); }
+    start(els.inSeed.value.trim(), rec, mode, names);
   });
   els.dlgSquirrel.addEventListener('close', () => {
     if (els.dlgSquirrel.returnValue === 'ok') doPlace(true);
   });
+  els.dlgTurn.addEventListener('close', afterTurnDialog);
   els.dlgEnd.addEventListener('close', () => {
     const v = els.dlgEnd.returnValue;
-    if (v === 'again') start(state.seed, state.recipes ? state.recipes.slice() : false);
-    else if (v === 'next') start(null, state.recipes ? true : false);
+    const names = match.players.map((p) => p.name);
+    if (v === 'again') start(state.seed, state.recipes ? state.recipes.slice() : false, match.mode, names);
+    else if (v === 'next') start(null, state.recipes ? true : false, match.mode, names);
+  });
+
+  // Pastille du joueur / liste des joueurs : après la partie, voir chaque verger.
+  els.playerPill.addEventListener('click', () => {
+    if (allOver()) viewPlayer(1 - viewedIndex());
+    else toast(`C’est au tour de ${curPlayer().name}.`);
+  });
+  els.playersList.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-player]');
+    if (b) viewPlayer(Number(b.dataset.player));
+  });
+
+  // Menu (logo en haut à gauche)
+  els.btnMenu.addEventListener('click', () => openDialog(els.dlgMenu));
+  els.dlgMenu.addEventListener('close', () => {
+    const v = els.dlgMenu.returnValue;
+    if (v === 'solo') openNew('solo');
+    else if (v === 'duo') openNew('duo');
+    else if (v === 'custom') openCustom();
+    else if (v === 'rules') openDialog(els.dlgRules);
+  });
+  els.menuInstall.addEventListener('click', () => { if (els.dlgMenu.open) els.dlgMenu.close(); });
+
+  // Personnalisation : fond du terrain et design des cartes
+  function applyPrefs() { document.body.dataset.board = prefs.board; }
+  function renderCustom() {
+    els.optBoards.innerHTML = Object.entries(BOARDS).map(([id, name]) =>
+      `<button type="button" class="opt${prefs.board === id ? ' on' : ''}" data-board-opt="${id}" aria-pressed="${prefs.board === id}"><span class="swatch" data-board="${id}"></span><span class="opt-name">${name}</span></button>`).join('');
+    els.optCards.innerHTML = Object.entries(CARD_THEMES).map(([id, T]) =>
+      `<button type="button" class="opt${prefs.cards === id ? ' on' : ''}" data-card-opt="${id}" aria-pressed="${prefs.cards === id}"><svg viewBox="-6 -4 312 212" aria-hidden="true">${cardArt(H.cardById(9), id)}</svg><span class="opt-name">${T.name}</span></button>`).join('');
+  }
+  function openCustom() { renderCustom(); openDialog(els.dlgCustom); }
+  els.optBoards.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-board-opt]');
+    if (!b) return;
+    prefs.board = b.dataset.boardOpt;
+    savePrefs(); applyPrefs(); renderCustom();
+  });
+  els.optCards.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-card-opt]');
+    if (!b) return;
+    prefs.cards = b.dataset.cardOpt;
+    savePrefs(); renderCustom(); renderAll(); renderLegend();
   });
   els.dlgRules.addEventListener('close', () => { try { localStorage.setItem(SEEN_KEY, '1'); } catch (e) { /* ignore */ } });
 
@@ -950,6 +1179,7 @@
 
   // ---------------------------------------------------------------- Démarrage
   buildDefs();
+  applyPrefs();
   for (const el of document.querySelectorAll('.app-version')) el.textContent = APP_VERSION;
   renderLegend();
   fillRecipeSelects();
@@ -961,11 +1191,11 @@
   } else if (load()) {
     computeView();
     renderAll();
-    if (state.over) ui.endShown = true;
+    if (allOver()) ui.endShown = true;
   } else {
     start(null, false);
   }
   let seen = false;
   try { seen = !!localStorage.getItem(SEEN_KEY); } catch (e) { seen = true; }
-  if (!seen) els.dlgRules.showModal();
+  if (!seen && !els.dlgTurn.open) openDialog(els.dlgRules);
 })();

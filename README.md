@@ -44,9 +44,15 @@ docker run -p 3000:3000 -e PORT=3000 ortie
 - **Recettes** (au verso des cartes) : deux Recettes donnent l'objectif de score (somme de leurs nombres) et un bonus si leur condition est remplie. Les cartes utilisées comme Recettes sont retirées de la pioche.
 - **Mode compétitif** : le même numéro de partie donne les mêmes cartes, dans le même ordre (lien partageable `?partie=1234&recettes=7,5`).
 
+## Menu (logo en haut à gauche)
+
+- **Partie solo** et **Jouer à deux** : à deux, sur le même appareil, les joueurs reçoivent les mêmes 9 cartes et construisent chacun leur verger à tour de rôle (un écran « À … de jouer » invite à se passer l'appareil). Le meilleur score gagne, puis le plus de dés en jeu en cas d'égalité, comme dans la règle multijoueur du jeu. À la fin, la pastille du joueur en haut du plateau permet de regarder chaque verger.
+- **Personnaliser** : fond du terrain (chêne clair, noyer, tapis bleu, lin, ardoise, tomettes) et design des cartes (classique, printemps, automne, nuit, hiver). Les choix sont gardés sur l'appareil.
+- **Règles du jeu** et **Installer l'appli**.
+
 ## Aides de jeu
 
-- La carte choisie apparaît directement à la meilleure position. Il suffit de la déplacer (souris ou doigt), de la tourner, puis de la poser.
+- Choisir une carte ne la pose pas : elle apparaît là où l'on touche ou survole le verger, ou là où on la fait glisser. On la tourne, puis on la pose. Le bouton **Conseil** (💡) reste disponible pour qui veut l'emplacement le plus rentable.
 - On peut aussi faire glisser une carte de la main directement sur le plateau.
 - Sur téléphone, **deux touchers rapides** sur la carte (sur le plateau ou dans la main) la tournent d'un quart de tour. Un toucher simple ailleurs sur le plateau y déplace la carte.
 - Les gestes au doigt utilisent les évènements tactiles natifs (fiables sur Safari iOS). Le zoom au double toucher, le pincement et le rebond de la page sont bloqués. La barre du bas a une hauteur fixe, pour que le plateau ne change jamais de taille pendant un geste.
