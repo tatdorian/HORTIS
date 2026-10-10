@@ -140,7 +140,7 @@
     { id: 9, name: 'Liqueur au citron', target: 44, color: 'citron', icon: 'bottle', kind: 'double', t: 'citron', mult: 2, text: 'Tous <b>les dés jaunes</b> comptent double' },
     { id: 1, name: 'Tarte au citron vert', target: 44, color: 'vert', icon: 'pie', kind: 'double', t: 'vert', mult: 2, text: 'Tous <b>les dés verts</b> comptent double' },
     { id: 7, name: 'Punch', target: 40, color: null, icon: 'punch', kind: 'punch', mult: 2, text: '<b>Le fruit rapportant le moins de points</b> (avant application des bonus) compte double' },
-    { id: 8, name: 'Cake aux fruits', target: 26, color: null, icon: 'cake', kind: 'cake', pts: 4, text: 'Au moins <b>1 clairière</b> doit être entourée <b>de 4 dés</b>', small: 'sur des arbres ou des clairières' },
+    { id: 8, name: 'Cake aux fruits', target: 26, color: null, icon: 'cake', kind: 'cake', pts: 4, text: 'Au moins <b>1 clairière</b> doit être entourée <b>de 4 dés</b>', small: 'au-dessus, en dessous, à gauche et à droite, sur des arbres ou des clairières · un arbre sans dé ne compte pas' },
     { id: 13, name: 'Panier de fruits', target: 27, color: null, icon: 'basket', kind: 'basket', pts: 3, text: 'Au moins <b>1 panier</b> doit être en jeu', small: 'sur un arbre ou une clairière · la Brouette compte aussi' },
     { id: 14, name: 'Salade de fruits', target: 28, color: null, icon: 'bowl', kind: 'salad', pts: 6, text: 'Au moins <b>3 dés d’un même fruit</b> doivent être placés sur des arbres/clairières adjacents' },
     { id: 2, name: 'Cocktail de fruits', target: 29, color: null, icon: 'cocktail', kind: 'cocktail', pts: 5, text: 'Les <b>15 dés</b> doivent être en jeu', small: 'sur des arbres ou des clairières' },
@@ -231,12 +231,23 @@
         short = Math.min(...TYPES.map((t) => Math.min(of(t).length, 4))) + '/4';
         break;
       case 'cake': {
-        let best = 0;
+        // La clairière la plus avancée, désignée par le numéro de sa carte, et
+        // les côtés où il manque encore un dé.
+        let best = -1;
+        let bestK = null;
         for (const [k, e] of Object.entries(state.board)) {
           if (e.cell.k !== 'clear') continue;
-          best = Math.max(best, neighbours(k).filter((n) => state.board[n] && state.board[n].die).length);
+          const n = neighbours(k).filter((nk) => state.board[nk] && state.board[nk].die).length;
+          if (n > best) { best = n; bestK = k; }
         }
-        text = 'meilleure clairière : ' + best + '/4 dés autour';
+        if (bestK == null) { text = 'aucune clairière en jeu'; short = '0/4'; break; }
+        const e = state.board[bestK];
+        const where = e.die ? 'la clairière sous le dé ' + DIE_LABEL[e.die.t] : 'la clairière n° ' + e.card;
+        const SIDES = ['à droite', 'à gauche', 'en dessous', 'au-dessus']; // même ordre que neighbours()
+        const miss = neighbours(bestK).map((nk, i) => (state.board[nk] && state.board[nk].die ? null : SIDES[i])).filter(Boolean);
+        const list = miss.length > 1 ? miss.slice(0, -1).join(', ') + ' et ' + miss[miss.length - 1] : miss[0];
+        text = !miss.length ? where + ' est entourée de 4 dés'
+          : where + ' : ' + best + '/4 dés autour · il manque ' + (miss.length === 1 ? 'un dé ' : 'des dés ') + list;
         short = best + '/4';
         break;
       }

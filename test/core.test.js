@@ -273,3 +273,31 @@ test('progression courte (barre Recettes du plateau)', () => {
   const sc = H.score(Object.assign(s, { recipes: [11, 7] }));
   assert.deepStrictEqual(sc.recipes.map((r) => r.short), ['2/5', '×2']);
 });
+
+test('Cake aux fruits : la progression désigne la clairière et le côté où il manque un dé', () => {
+  // La situation signalée par un joueur : clairière de la carte 5 avec un dé
+  // au-dessus, à gauche et en dessous, mais un arbre SANS dé à droite.
+  const s = blank();
+  put(s, 1, 1, clear());
+  s.board['1,1'].card = 5;
+  put(s, 1, 0, tree('vert'), { t: 'vert', v: 3 });
+  put(s, 0, 1, tree('orange'), { t: 'orange', v: 5 });
+  put(s, 1, 2, tree('orange'), { t: 'orange', v: 4 });
+  put(s, 2, 1, tree('vert')); // arbre sans dé : ne compte pas
+  put(s, 3, 3, clear()); // autre clairière, moins avancée
+  s.board['3,3'].card = 18;
+  const R = H.RECIPE_BY_ID[8];
+  assert.ok(!H.recipeDone(s, R));
+  let p = H.recipeProgress(s, R);
+  assert.strictEqual(p.short, '3/4');
+  assert.strictEqual(p.text, 'la clairière n° 5 : 3/4 dés autour · il manque un dé à droite');
+  s.board['2,1'].die = { t: 'vert', v: 2 };
+  assert.ok(H.recipeDone(s, R));
+  p = H.recipeProgress(s, R);
+  assert.strictEqual(p.text, 'la clairière n° 5 est entourée de 4 dés');
+  // plusieurs côtés manquants ; clairière recouverte d'un dé
+  const s2 = blank();
+  put(s2, 0, 0, clear(), { t: 'citron', v: 3 });
+  put(s2, 0, 1, tree('vert'), { t: 'vert', v: 1 });
+  assert.strictEqual(H.recipeProgress(s2, R).text, 'la clairière sous le dé jaune : 1/4 dés autour · il manque des dés à droite, à gauche et au-dessus');
+});
