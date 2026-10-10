@@ -20,7 +20,7 @@
   <!-- Le numéro de version dans l'adresse des fichiers garantit qu'une page neuve
        ne charge jamais un ancien style.css / app.js gardé en cache (téléphone,
        appli installée ou hébergeur). À changer à chaque version (cf. sw.js). -->
-  <link rel="stylesheet" href="style.css?v=1.11">
+  <link rel="stylesheet" href="style.css?v=1.12">
   <script>
     /* Garde-fou silencieux : si le jeu ne démarre pas (ex. un ancien fichier
        resté en cache), on recharge automatiquement la dernière version, une
@@ -46,7 +46,7 @@
         try { sessionStorage.setItem(KEY, '1'); } catch (e) { return; }
         clearAndReload();
       }
-      window.ortieClearCache = clearAndReload; // option du menu Ortie → Paramètres
+      window.ortieClearCache = clearAndReload; // menu Ortie → Paramètres → Application
       window.addEventListener('error', function () { setTimeout(autoFix, 300); });
       window.addEventListener('load', function () { setTimeout(autoFix, 2500); });
     })();
@@ -172,7 +172,8 @@
       <div class="menu-list">
         <button value="solo" class="menu-item"><span class="mi-ico" style="--c:#3f8f3a">🌱</span><span class="mi-txt"><b>Partie solo</b><small>Battez votre record en 9 cartes</small></span></button>
         <button value="duo" class="menu-item"><span class="mi-ico" style="--c:#3b7fc4">👥</span><span class="mi-txt"><b>Jouer à deux</b><small>Mêmes cartes, chacun son verger, à tour de rôle</small></span></button>
-        <button value="custom" class="menu-item"><span class="mi-ico" style="--c:#d9822b">⚙️</span><span class="mi-txt"><b>Paramètres</b><small>Son, fond du terrain, design des cartes</small></span></button>
+        <button value="custom" class="menu-item"><span class="mi-ico" style="--c:#d9822b">🎨</span><span class="mi-txt"><b>Personnaliser</b><small>Thème clair ou sombre, fond du terrain, cartes</small></span></button>
+        <button value="settings" class="menu-item"><span class="mi-ico" style="--c:#6f6a52">⚙️</span><span class="mi-txt"><b>Paramètres</b><small>Son, application</small></span></button>
         <button value="rules" class="menu-item"><span class="mi-ico" style="--c:#8a6bc4">📖</span><span class="mi-txt"><b>Règles du jeu</b><small>Comment jouer, raccourcis</small></span></button>
         <a href="#" class="menu-item install-link" id="menu-install" hidden><span class="mi-ico" style="--c:#2f6b3a">⬇</span><span class="mi-txt"><b>Installer l’appli</b><small>iPhone, Android, ordinateur</small></span></a>
       </div>
@@ -181,6 +182,21 @@
 
   <!-- Personnalisation -->
   <dialog id="dlg-custom" class="dlg custom">
+    <form method="dialog">
+      <h2>Personnaliser</h2>
+      <h3>Thème</h3>
+      <div id="opt-themes" class="opt-grid themes"></div>
+      <h3>Fond du terrain</h3>
+      <div id="opt-boards" class="opt-grid boards"></div>
+      <h3>Design des cartes</h3>
+      <div id="opt-cards" class="opt-grid cards"></div>
+      <p class="small-note">Vos choix sont gardés sur cet appareil.</p>
+      <div class="dlg-actions"><button value="ok" class="btn primary">Terminé</button></div>
+    </form>
+  </dialog>
+
+  <!-- Paramètres -->
+  <dialog id="dlg-settings" class="dlg settings">
     <form method="dialog">
       <h2>Paramètres</h2>
       <h3>Son</h3>
@@ -196,16 +212,12 @@
           <span class="snd-val" id="sfx-val"></span>
         </div>
       </div>
-      <h3>Fond du terrain</h3>
-      <div id="opt-boards" class="opt-grid boards"></div>
-      <h3>Design des cartes</h3>
-      <div id="opt-cards" class="opt-grid cards"></div>
-      <p class="small-note">Vos choix sont gardés sur cet appareil.</p>
       <h3>Application</h3>
       <div class="app-opt">
-        <div><b>Vider le cache et recharger</b><small>Si l’appli affiche une ancienne version. Votre partie et vos réglages sont gardés. Version <span class="app-version"></span>.</small></div>
+        <div><b>Vider le cache et recharger</b><small>Si l’appli affiche une ancienne version. Votre partie et vos réglages sont gardés.</small></div>
         <button type="button" id="btn-clear-cache" class="btn ghost">Vider</button>
       </div>
+      <p class="small-note">Ortie · version <span class="app-version"></span></p>
       <div class="dlg-actions"><button value="ok" class="btn primary">Terminé</button></div>
     </form>
   </dialog>
@@ -284,8 +296,8 @@
         <p>Après la 9<sup>e</sup> carte (ou si plus aucune carte ne peut être posée), additionnez les dés posés sur des arbres. S’il n’y a plus de dé de la bonne couleur en réserve, on n’en place pas.</p>
         <h3>À deux, sur le même appareil</h3>
         <p>Touchez le logo en haut à gauche, puis <b>« Jouer à deux »</b>. Les deux joueurs reçoivent les mêmes 9 cartes et construisent chacun leur verger, à tour de rôle : on se passe l’appareil à chaque carte posée. Le meilleur score gagne ; en cas d’égalité, celui qui a le plus de dés en jeu.</p>
-        <h3>Paramètres</h3>
-        <p>Logo en haut à gauche → <b>« Paramètres »</b> : musique et effets sonores (désactivables, volume réglable), fond du terrain et design des cartes.</p>
+        <h3>Personnaliser et Paramètres</h3>
+        <p>Logo en haut à gauche → <b>« Personnaliser »</b> : thème clair ou sombre, fond du terrain et design des cartes. <b>« Paramètres »</b> : musique et effets sonores (désactivables, volume réglable) et application.</p>
         <h3>Recettes</h3>
         <p>Au verso des cartes. Avec deux Recettes, additionnez leurs nombres : c’est votre objectif. Leur bonus s’ajoute si la condition est remplie en fin de partie. Les cartes Recette ne font pas partie de la pioche.</p>
         <h3>Raccourcis</h3>
@@ -353,9 +365,9 @@
     </defs>
   </svg>
 
-  <script src="core.js?v=1.11"></script>
-  <script src="sound.js?v=1.11"></script>
-  <script src="app.js?v=1.11"></script>
-  <script src="install.js?v=1.11"></script>
+  <script src="core.js?v=1.12"></script>
+  <script src="sound.js?v=1.12"></script>
+  <script src="app.js?v=1.12"></script>
+  <script src="install.js?v=1.12"></script>
 </body>
 </html>

@@ -4,7 +4,7 @@
   const H = window.OrtieCore;
   const S = 100; // taille d'une case en unités SVG
   const CW = H.CARD_W * S, CH = H.CARD_H * S;
-  const APP_VERSION = '1.11';
+  const APP_VERSION = '1.12';
   const STORE_KEY = 'ortie.save.v3';
   const OLD_STORE_KEY = 'ortie.save.v2';
   const SEEN_KEY = 'ortie.seenRules';
@@ -25,7 +25,8 @@
   };
   const BOARDS = { oak: 'Chêne clair', walnut: 'Noyer', felt: 'Tapis bleu', linen: 'Lin', slate: 'Ardoise', terracotta: 'Tomettes' };
   const PLAYER_COLORS = ['#f06a32', '#3b7fc4'];
-  const prefs = { board: 'oak', cards: 'classic', names: ['', ''], sound: { music: true, sfx: true, musicVol: 0.4, sfxVol: 0.7 } };
+  const THEMES = { auto: 'Automatique', light: 'Clair', dark: 'Sombre' };
+  const prefs = { theme: 'auto', board: 'oak', cards: 'classic', names: ['', ''], sound: { music: true, sfx: true, musicVol: 0.4, sfxVol: 0.7 } };
   try {
     const saved = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
     Object.assign(prefs, saved, { sound: Object.assign({}, prefs.sound, saved.sound || {}) });
@@ -35,6 +36,7 @@
   snd.configure(prefs.sound);
   const sfx = (name, opt) => { try { snd.play(name, opt); } catch (e) { /* le son ne doit jamais bloquer le jeu */ } };
   if (!BOARDS[prefs.board]) prefs.board = 'oak';
+  if (!THEMES[prefs.theme]) prefs.theme = 'auto';
   if (!CARD_THEMES[prefs.cards]) prefs.cards = 'classic';
   function savePrefs() { try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch (e) { /* ignore */ } }
 
@@ -59,7 +61,7 @@
     inSeed: $('in-seed'), inRecipes: $('in-recipes'), inR1: $('in-r1'), inR2: $('in-r2'), recipePick: $('recipe-pick'),
     endTitle: $('end-title'), endBody: $('end-body'), legend: $('legend'), defs: $('defs'),
     btnMenu: $('btn-menu'), dlgMenu: $('dlg-menu'), menuInstall: $('menu-install'),
-    dlgCustom: $('dlg-custom'), optBoards: $('opt-boards'), optCards: $('opt-cards'),
+    dlgCustom: $('dlg-custom'), optBoards: $('opt-boards'), optCards: $('opt-cards'), optThemes: $('opt-themes'), dlgSettings: $('dlg-settings'),
     dlgTurn: $('dlg-turn'), turnBody: $('turn-body'),
     inModeSolo: $('in-mode-solo'), inModeDuo: $('in-mode-duo'), duoNames: $('duo-names'), inP1: $('in-p1'), inP2: $('in-p2'),
     players: $('players'), playersList: $('players-list'), playerPill: $('player-pill'), whoChip: $('who-chip'), whoMini: $('who-mini'),
@@ -1168,19 +1170,32 @@
     if (v === 'solo') openNew('solo');
     else if (v === 'duo') openNew('duo');
     else if (v === 'custom') openCustom();
+    else if (v === 'settings') openSettings();
     else if (v === 'rules') openDialog(els.dlgRules);
   });
   els.menuInstall.addEventListener('click', () => { if (els.dlgMenu.open) els.dlgMenu.close(); });
 
   // Personnalisation : fond du terrain et design des cartes
-  function applyPrefs() { document.body.dataset.board = prefs.board; }
+  const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
+  function applyPrefs() {
+    document.body.dataset.board = prefs.board;
+    const root = document.documentElement;
+    if (prefs.theme === 'auto') root.removeAttribute('data-theme'); else root.dataset.theme = prefs.theme;
+    const dark = prefs.theme === 'dark' || (prefs.theme === 'auto' && darkQuery.matches);
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', dark ? '#171b14' : '#2f6b3a');
+  }
+  try { darkQuery.addEventListener('change', applyPrefs); } catch (e) { /* ancien Safari */ }
   function renderCustom() {
+    els.optThemes.innerHTML = Object.entries(THEMES).map(([id, name]) =>
+      `<button type="button" class="opt${prefs.theme === id ? ' on' : ''}" data-theme-opt="${id}" aria-pressed="${prefs.theme === id}"><span class="theme-swatch" data-t="${id}"><i></i><i></i><i></i></span><span class="opt-name">${name}</span></button>`).join('');
     els.optBoards.innerHTML = Object.entries(BOARDS).map(([id, name]) =>
       `<button type="button" class="opt${prefs.board === id ? ' on' : ''}" data-board-opt="${id}" aria-pressed="${prefs.board === id}"><span class="swatch" data-board="${id}"></span><span class="opt-name">${name}</span></button>`).join('');
     els.optCards.innerHTML = Object.entries(CARD_THEMES).map(([id, T]) =>
       `<button type="button" class="opt${prefs.cards === id ? ' on' : ''}" data-card-opt="${id}" aria-pressed="${prefs.cards === id}"><svg viewBox="-6 -4 312 212" aria-hidden="true">${cardArt(H.cardById(9), id)}</svg><span class="opt-name">${T.name}</span></button>`).join('');
   }
-  function openCustom() { renderCustom(); renderSound(); openDialog(els.dlgCustom); }
+  function openCustom() { renderCustom(); openDialog(els.dlgCustom); }
+  function openSettings() { renderSound(); openDialog(els.dlgSettings); }
 
   const sndEls = { music: $('in-music'), sfx: $('in-sfx'), musicVol: $('in-music-vol'), sfxVol: $('in-sfx-vol'), musicVal: $('music-val'), sfxVal: $('sfx-val') };
   function renderSound() {
@@ -1215,6 +1230,12 @@
     btnClear.textContent = 'Rechargement…';
     save();
     if (window.ortieClearCache) window.ortieClearCache(); else location.reload();
+  });
+  els.optThemes.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-theme-opt]');
+    if (!b) return;
+    prefs.theme = b.dataset.themeOpt;
+    savePrefs(); applyPrefs(); renderCustom();
   });
   els.optBoards.addEventListener('click', (e) => {
     const b = e.target.closest('[data-board-opt]');
