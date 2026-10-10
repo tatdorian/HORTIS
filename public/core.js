@@ -206,23 +206,30 @@
     const of = (t) => dice.filter((d) => d.t === t);
     const final = !!state.over || (r.kind === 'first' && state.placed.length > 1);
     let text = '';
+    let short = ''; // version très courte, pour la barre Recettes du plateau
     switch (r.kind) {
       case 'first':
         text = state.placed.length <= 1 ? 'à faire avec votre 1re carte posée' : (state.firstTurnDice || []).includes(r.t) ? 'fait au 1er tour' : 'pas de dé ' + DIE_LABEL[r.t] + ' au 1er tour';
+        short = state.placed.length <= 1 ? '1er tour' : (state.firstTurnDice || []).includes(r.t) ? 'fait' : 'raté';
         break;
-      case 'all5': text = of(r.t).length + '/5 dés ' + COLOR_WORD[r.t] + ' en jeu'; break;
+      case 'all5': text = of(r.t).length + '/5 dés ' + COLOR_WORD[r.t] + ' en jeu'; short = Math.min(of(r.t).length, 5) + '/5'; break;
       case 'six': {
         const vals = of(r.t).map((d) => d.v).sort((a, b) => a - b);
         text = vals.length ? 'dés ' + COLOR_WORD[r.t] + ' : ' + vals.map((v) => (v >= BASKET ? 'panier' : v)).join(', ') : 'aucun dé ' + DIE_LABEL[r.t] + ' en jeu';
+        short = (vals.includes(6) ? 6 : Math.max(0, ...vals.filter((v) => v < 6))) + '/6';
         break;
       }
       case 'basket': {
         const n = Object.values(state.board).filter((e) => e.die && (e.die.barrow || e.die.v === BASKET)).length;
         text = n ? n + ' panier' + (n > 1 ? 's' : '') + ' en jeu (Brouette comprise)' : 'aucun panier en jeu';
+        short = Math.min(n, 1) + '/1';
         break;
       }
-      case 'cocktail': text = dice.length + '/15 dés en jeu'; break;
-      case 'tutti': text = TYPES.map((t) => DIE_LABEL[t] + ' ' + Math.min(of(t).length, 4) + '/4').join(' · '); break;
+      case 'cocktail': text = dice.length + '/15 dés en jeu'; short = Math.min(dice.length, 15) + '/15'; break;
+      case 'tutti':
+        text = TYPES.map((t) => DIE_LABEL[t] + ' ' + Math.min(of(t).length, 4) + '/4').join(' · ');
+        short = Math.min(...TYPES.map((t) => Math.min(of(t).length, 4))) + '/4';
+        break;
       case 'cake': {
         let best = 0;
         for (const [k, e] of Object.entries(state.board)) {
@@ -230,6 +237,7 @@
           best = Math.max(best, neighbours(k).filter((n) => state.board[n] && state.board[n].die).length);
         }
         text = 'meilleure clairière : ' + best + '/4 dés autour';
+        short = best + '/4';
         break;
       }
       case 'salad': {
@@ -245,11 +253,12 @@
           best = Math.max(best, size);
         }
         text = 'plus grand groupe : ' + Math.min(best, 3) + '/3 dés';
+        short = Math.min(best, 3) + '/3';
         break;
       }
-      default: text = 'toujours appliquée'; break;
+      default: text = 'toujours appliquée'; short = '×2'; break;
     }
-    return { text, final };
+    return { text, short, final };
   }
 
   function bounds(state) {
@@ -517,7 +526,7 @@
           effect = r.pts;
         }
         const prog = recipeProgress(state, r);
-        recipes.push(Object.assign({}, r, { done, effect, detail, progress: prog.text, final: prog.final }));
+        recipes.push(Object.assign({}, r, { done, effect, detail, progress: prog.text, short: prog.short, final: prog.final }));
       }
     }
     const scored = {};

@@ -251,3 +251,25 @@ test('progression des recettes : texte lisible et résultat définitif', () => {
   s.over = true;
   assert.ok(H.recipeProgress(s, H.RECIPE_BY_ID[11]).final);
 });
+
+test('progression courte (barre Recettes du plateau)', () => {
+  const s = blank();
+  s.placed = [{ id: 1 }];
+  put(s, 0, 0, tree('orange'), { t: 'orange', v: 3 });
+  put(s, 1, 0, tree('orange'), { t: 'orange', v: 5 });
+  put(s, 2, 0, tree('citron'), { t: 'citron', v: 6 });
+  const short = (id) => H.recipeProgress(s, H.RECIPE_BY_ID[id]).short;
+  assert.strictEqual(short(11), '2/5'); // Jus d'orange
+  assert.strictEqual(short(6), '5/6'); // Gelée à l'orange : meilleur dé orange
+  assert.strictEqual(short(16), '6/6'); // Tarte au citron meringuée
+  assert.strictEqual(short(10), '0/6'); // aucun dé vert
+  assert.strictEqual(short(2), '3/15'); // Cocktail de fruits
+  assert.strictEqual(short(5), '0/4'); // Tutti Frutti : la couleur la moins avancée
+  assert.strictEqual(short(14), '2/3'); // Salade : 2 oranges côte à côte
+  assert.strictEqual(short(13), '0/1'); // Panier de fruits
+  assert.strictEqual(short(15), '1er tour');
+  assert.strictEqual(short(7), '×2'); // Punch
+  // le score transmet aussi la version courte
+  const sc = H.score(Object.assign(s, { recipes: [11, 7] }));
+  assert.deepStrictEqual(sc.recipes.map((r) => r.short), ['2/5', '×2']);
+});

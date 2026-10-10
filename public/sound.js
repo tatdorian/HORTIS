@@ -4,7 +4,7 @@
  *   OrtieSound.configure({ music, sfx, musicVol, sfxVol })   // réglages (0..1)
  *   OrtieSound.play('place' | 'select' | 'rotate' | 'bad' | 'undo' | 'hint'
  *                   | 'basket' | 'barrow' | 'squirrel' | 'turn' | 'start'
- *                   | 'win' | 'end' | 'ui' | 'test')
+ *                   | 'recipe' | 'win' | 'end' | 'ui' | 'test')
  *   OrtieSound.dice([valeurs])   // un petit son par dé posé ou augmenté
  *
  * Les navigateurs n'autorisent le son qu'après un premier geste du joueur :
@@ -175,6 +175,10 @@
         bell(mtof(91), t + 0.8, 0.06, 1.4, B);
         break;
       }
+      case 'recipe': // recette réussie : petite cloche montante
+        [76, 79, 84].forEach((m, i) => pluck(mtof(m), t + i * 0.08, 0.11, 0.4, B));
+        bell(mtof(88), t + 0.26, 0.07, 1.1, B);
+        break;
       case 'squirrel': // petits cris d'écureuil
         [0, 0.1, 0.2].forEach((d) => osc('sine', 1700, t + d, 0.07, 0.07, 0.004, B, { to: 3400, glide: 0.05 }));
         break;

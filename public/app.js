@@ -4,7 +4,7 @@
   const H = window.OrtieCore;
   const S = 100; // taille d'une case en unités SVG
   const CW = H.CARD_W * S, CH = H.CARD_H * S;
-  const APP_VERSION = '1.14';
+  const APP_VERSION = '1.15';
   const STORE_KEY = 'ortie.save.v3';
   const OLD_STORE_KEY = 'ortie.save.v2';
   const SEEN_KEY = 'ortie.seenRules';
@@ -52,7 +52,7 @@
     reserve: $('reserve'), barrow: $('tok-barrow'), squirrel: $('tok-squirrel'),
     scoreTotal: $('score-total'), scoreMini: $('score-mini'), objMini: $('obj-mini'), resMini: $('res-mini'),
     btnDetails: $('btn-details'), btnSideClose: $('btn-side-close'), sideBackdrop: $('side-backdrop'), boardWrap: document.querySelector('.board-wrap'), scoreRank: $('score-rank'), scoreRows: $('score-rows'), objective: $('objective'),
-    recipes: $('recipes'), recipeList: $('recipe-list'), seed: $('seed-label'), turn: $('turn-label'),
+    recipes: $('recipes'), recipeList: $('recipe-list'), recipeBar: $('recipe-bar'), recipePop: $('recipe-pop'), seed: $('seed-label'), turn: $('turn-label'),
     hint: $('hint'), toast: $('toast'),
     btnUndo: $('btn-undo'), btnNew: $('btn-new'), btnPlace: $('btn-place'),
     placeLabel: $('place-label'), placeGain: $('place-gain'),
@@ -440,7 +440,7 @@
     fitText(els.boardHelp, narrow ? 12 : 13, 9);
   }
   let fitTimer = 0;
-  window.addEventListener('resize', () => { clearTimeout(fitTimer); fitTimer = setTimeout(fitTexts, 80); });
+  window.addEventListener('resize', () => { clearTimeout(fitTimer); fitTimer = setTimeout(() => { fitTexts(); placeRecipeBar(); }, 80); });
 
   let lastPointerType = 'mouse';
   const touchMode = () => lastPointerType !== 'mouse' || window.matchMedia('(hover: none)').matches;
@@ -543,6 +543,69 @@
 
     els.btnUndo.disabled = history.length === 0;
     renderPlayers();
+    renderRecipeBar(sc);
+  }
+
+  // Barre Recettes sur le plateau (téléphone) : où en est chaque recette d'un
+  // coup d'œil ; un toucher ouvre les cartes complètes par-dessus le plateau.
+  function renderRecipeBar(sc) {
+    const on = sc.recipes.length > 0;
+    document.body.classList.toggle('has-recipes', on);
+    els.recipeBar.hidden = !on;
+    if (!on) { closeRecipePop(); return; }
+    const flash = ui.recipeFlash || [];
+    ui.recipeFlash = null;
+    els.recipeBar.innerHTML = sc.recipes.map((x) => {
+      const r = H.RECIPE_BY_ID[x.id];
+      let cls = 'rb-chip';
+      let mark = '';
+      let txt = x.short;
+      if (r.mult) {
+        cls += ' x2';
+        // Punch : le fruit doublé change en cours de partie, on le montre.
+        if (r.kind === 'punch') {
+          const low = H.TYPES.slice().sort((a, b) => sc.byType[a] - sc.byType[b])[0];
+          mark = `<i class="rb-dot" style="background:${DIE_FILL[low]}"></i>`;
+        }
+      } else if (x.done) { cls += ' ok'; mark = '<span class="rb-mark">✔</span>'; }
+      else if (x.final) { cls += ' ko'; mark = '<span class="rb-mark">✘</span>'; }
+      if (flash.includes(x.id)) cls += ' flash';
+      const label = `${r.name} : ${r.mult ? x.detail || 'compte double' : x.progress}`;
+      return `<button type="button" class="${cls}" aria-label="${esc(label)}" title="${esc(label)}"><svg viewBox="0 0 80 80" class="rb-ico" aria-hidden="true">${recipeIcon(r)}</svg><span class="rb-txt">${txt}</span>${mark}</button>`;
+    }).join('');
+    els.recipeBar.classList.toggle('open', !els.recipePop.hidden);
+    placeRecipeBar();
+    if (!els.recipePop.hidden) fillRecipePop(sc);
+  }
+
+  // À deux, la barre passe sous l'étiquette du joueur si elles se touchent.
+  function placeRecipeBar() {
+    const bar = els.recipeBar;
+    bar.classList.remove('below');
+    if (!bar.hidden && !els.playerPill.hidden) {
+      const a = els.playerPill.getBoundingClientRect();
+      const b = bar.getBoundingClientRect();
+      if (b.width && a.width && a.right + 6 > b.left) bar.classList.add('below');
+    }
+    document.body.classList.toggle('rb-below', bar.classList.contains('below'));
+  }
+
+  function fillRecipePop(sc) {
+    const obj = sc.target != null ? `<span class="rp-obj${sc.won ? ' won' : ''}">Objectif <b>${sc.total} / ${sc.target}</b></span>` : '';
+    els.recipePop.innerHTML = `<div class="rp-head"><h2>Recettes</h2>${obj}<button type="button" class="btn icon rp-close" aria-label="Fermer">✕</button></div>`
+      + `<div class="recipe-list">${sc.recipes.map((x) => recipeCardHtml(H.RECIPE_BY_ID[x.id], x)).join('')}</div>`;
+  }
+  function openRecipePop() {
+    fillRecipePop(H.score(state));
+    els.recipePop.hidden = false;
+    els.recipePop.scrollTop = 0;
+    els.recipeBar.classList.add('open');
+    sfx('ui');
+  }
+  function closeRecipePop() {
+    if (els.recipePop.hidden) return;
+    els.recipePop.hidden = true;
+    els.recipeBar.classList.remove('open');
   }
 
   function renderPlayers() {
@@ -765,9 +828,12 @@
     if (!d.open) d.showModal();
   }
 
+  const recipesDone = (s) => (s.recipes ? H.score(s).recipes.filter((x) => x.done && !x.mult).map((x) => x.id) : []);
+
   function doPlace(withSquirrel) {
     if (ui.locked) return;
     const before = JSON.stringify(match);
+    const doneBefore = recipesDone(state);
     const res = H.play(state, ui.sel, ui.rot, ui.pos.x, ui.pos.y, { allowSquirrel: withSquirrel });
     if (!res.ok) { toast(res.reason, 'bad'); return; }
     history.push(before);
@@ -778,7 +844,13 @@
     try { snd.dice(res.changes.filter((c) => c.die && ['new', 'up', 'basket', 'barrow'].includes(c.event)).map((c) => c.die.v)); } catch (e) { /* ignore */ }
     const special = evs.includes('barrow') ? 'barrow' : evs.includes('basket') ? 'basket' : evs.includes('squirrel') ? 'squirrel' : null;
     if (special) setTimeout(() => sfx(special, special === 'barrow' ? { duck: 2 } : null), 220);
-    if (evs.includes('barrow')) toast('La Brouette entre en jeu : 15 fruits !', 'gold');
+    const newly = recipesDone(state).filter((id) => !doneBefore.includes(id));
+    if (newly.length) {
+      const r = H.RECIPE_BY_ID[newly[0]];
+      ui.recipeFlash = newly;
+      toast(`Recette ✔ ${r.name} +${r.pts}`, 'gold');
+      setTimeout(() => sfx('recipe'), special ? 700 : 240);
+    } else if (evs.includes('barrow')) toast('La Brouette entre en jeu : 15 fruits !', 'gold');
     else if (evs.includes('basket')) toast('Panier ! Ce dé vaut désormais 10.', 'gold');
     else if (evs.includes('squirrel')) toast('L’Écureuil garde désormais cet arbre.');
     else if (res.gain > 0) toast(`+${res.gain} fruits`, 'ok');
@@ -848,6 +920,10 @@
   function toast(msg, kind) {
     els.toast.textContent = msg;
     els.toast.className = 'toast show ' + (kind || '');
+    // une seule ligne, police réduite si besoin ; deux lignes seulement en dernier recours
+    els.toast.style.whiteSpace = 'nowrap';
+    fitText(els.toast, window.matchMedia('(max-width: 820px)').matches ? 14 : 15, 11);
+    if (els.toast.scrollWidth > els.toast.clientWidth + 1) els.toast.style.whiteSpace = 'normal';
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => { els.toast.className = 'toast'; }, 2400);
   }
@@ -940,6 +1016,7 @@
     clearTimeout(ui.turnTimer);
     ui.locked = false;
     ui.sel = null; ui.pos = null; ui.rot = 0; ui.endShown = false; ui.fresh = true;
+    closeRecipePop();
     computeView();
     save();
     renderAll();
@@ -1003,17 +1080,30 @@
   });
   els.board.addEventListener('pointerup', (e) => {
     if (e.pointerType === 'touch' || recentTouch()) return;
+    if (ui.swallowBoard) { ui.swallowBoard = false; return; } // ce clic a fermé les recettes
     if (ui.sel == null || state.over || e.button !== 0) return;
     const p = boardPoint(e);
     if (p) setPos(centerAt(p));
     tryPlace();
   });
 
+  // Recettes : la barre ouvre / ferme la fenêtre ; toucher ailleurs la ferme
+  // (ce toucher-là ne déplace pas la carte).
+  els.recipeBar.addEventListener('click', () => { if (els.recipePop.hidden) openRecipePop(); else closeRecipePop(); });
+  els.recipePop.addEventListener('click', (e) => { if (e.target.closest('.rp-close')) closeRecipePop(); });
+  document.addEventListener('pointerdown', (e) => {
+    if (els.recipePop.hidden || !e.target.closest || e.target.closest('.recipe-pop, .recipe-bar')) return;
+    closeRecipePop();
+    if (e.target.closest('.board-wrap')) ui.swallowBoard = true;
+  }, true);
+  const OVERLAY = '.player-pill, .recipe-bar, .recipe-pop';
+
   // Doigt : glisser = déplacer la carte, toucher = l'amener ici, double toucher = tourner.
   els.boardWrap.addEventListener('touchstart', (e) => {
-    if (e.target.closest && e.target.closest('.player-pill')) return;
+    if (e.target.closest && e.target.closest(OVERLAY)) return;
     noteTouch();
     if (e.cancelable) e.preventDefault();
+    if (ui.swallowBoard || !els.recipePop.hidden) { ui.swallowBoard = false; closeRecipePop(); ui.drag = null; return; }
     if (e.touches.length > 1) { ui.drag = null; return; }
     if (ui.sel == null || state.over) return;
     const t = e.changedTouches[0];
@@ -1022,7 +1112,7 @@
     ui.drag = { id: t.identifier, start: p, startPos: ui.pos ? Object.assign({}, ui.pos) : centerAt(p), moved: false, sx: t.clientX, sy: t.clientY };
   }, { passive: false });
   els.boardWrap.addEventListener('touchmove', (e) => {
-    if (e.target.closest && e.target.closest('.player-pill')) return;
+    if (e.target.closest && e.target.closest(OVERLAY)) return;
     if (e.cancelable) e.preventDefault();
     const d = ui.drag;
     if (!d) return;
@@ -1034,7 +1124,7 @@
     if (p) setPos({ x: d.startPos.x + Math.round(p.x - d.start.x), y: d.startPos.y + Math.round(p.y - d.start.y) });
   }, { passive: false });
   els.boardWrap.addEventListener('touchend', (e) => {
-    if (e.target.closest && e.target.closest('.player-pill')) return;
+    if (e.target.closest && e.target.closest(OVERLAY)) return;
     noteTouch();
     if (e.cancelable) e.preventDefault();
     const d = ui.drag;
@@ -1062,7 +1152,7 @@
   function canScroll(el) {
     for (let n = el; n && n !== document.body && n.nodeType === 1; n = n.parentElement) {
       if (n.matches('input, select, textarea')) return true;
-      if (n.matches('.rules-body, .side, dialog') && n.scrollHeight > n.clientHeight + 1) return true;
+      if (n.matches('.rules-body, .side, dialog, .recipe-pop') && n.scrollHeight > n.clientHeight + 1) return true;
     }
     return false;
   }
@@ -1089,7 +1179,7 @@
     }
     // Deux touchers rapides ailleurs (boutons…) : pas de zoom, mais le 2e toucher compte.
     const now = performance.now();
-    const inGame = els.boardWrap.contains(e.target) || els.hand.contains(e.target);
+    const inGame = (els.boardWrap.contains(e.target) && !e.target.closest(OVERLAY)) || els.hand.contains(e.target);
     if (!inGame && now - lastTouchEnd < 380 && e.cancelable && !e.target.closest('input, select, textarea')) {
       e.preventDefault();
       const btn = e.target.closest('button, label, summary');
@@ -1274,6 +1364,7 @@
     else if (k === 'h') suggest();
     else if (k === 'enter') { if (ui.sel != null) { e.preventDefault(); tryPlace(); } }
     else if (k === 'escape') {
+      if (!els.recipePop.hidden) { closeRecipePop(); return; }
       if (document.body.classList.contains('side-open')) { setSide(false); return; }
       ui.sel = null; ui.pos = null; renderHand(); renderGhost();
     }

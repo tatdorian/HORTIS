@@ -23,7 +23,7 @@ Ortie est une application web installable (PWA). Le bouton **Télécharger**, en
 
 Une fois installée, Ortie s'ouvre en plein écran depuis l'écran d'accueil ou le menu Démarrer, et fonctionne **hors connexion** grâce au service worker (`public/sw.js`).
 
-**Mises à jour fiables.** Les fichiers du jeu sont chargés avec leur numéro de version (`style.css?v=1.14`, `app.js?v=1.14`…). Une nouvelle page ne peut donc jamais utiliser un ancien style ou un ancien code resté en cache, que ce soit sur le téléphone, dans l'appli installée ou chez l'hébergeur. **À chaque nouvelle version, changer le numéro à trois endroits** : `APP_VERSION` dans `app.js`, `VERSION` dans `sw.js` et les `?v=` de `index.html` (cinq fichiers, dont `sound.js`). Un test (`npm test`) vérifie qu'ils sont identiques. Le serveur revalide les fichiers par empreinte de contenu (ETag), pas par date. Si le jeu ne démarre pas, l'appli vide son cache et se recharge toute seule, une seule fois. L'option « Vider le cache et recharger » existe aussi dans le menu Ortie → Paramètres. L'installation exige que le site soit servi en **https** (c'est le cas sur Railway, Coolify, etc.).
+**Mises à jour fiables.** Les fichiers du jeu sont chargés avec leur numéro de version (`style.css?v=1.15`, `app.js?v=1.15`…). Une nouvelle page ne peut donc jamais utiliser un ancien style ou un ancien code resté en cache, que ce soit sur le téléphone, dans l'appli installée ou chez l'hébergeur. **À chaque nouvelle version, changer le numéro à trois endroits** : `APP_VERSION` dans `app.js`, `VERSION` dans `sw.js` et les `?v=` de `index.html` (cinq fichiers, dont `sound.js`). Un test (`npm test`) vérifie qu'ils sont identiques. Le serveur revalide les fichiers par empreinte de contenu (ETag), pas par date. Si le jeu ne démarre pas, l'appli vide son cache et se recharge toute seule, une seule fois. L'option « Vider le cache et recharger » existe aussi dans le menu Ortie → Paramètres. L'installation exige que le site soit servi en **https** (c'est le cas sur Railway, Coolify, etc.).
 
 ## Déploiement avec Nixpacks
 
@@ -45,6 +45,7 @@ docker run -p 3000:3000 -e PORT=3000 ortie
 - Fin de partie : après la 9e carte, ou plus tôt si aucune carte ne peut être posée.
 - **Recettes** (au verso des cartes) : deux Recettes donnent l'objectif de score (somme de leurs nombres) et un bonus si leur condition est remplie. Les cartes utilisées comme Recettes sont retirées de la pioche.
   - Chaque carte Recette affiche sa progression en direct (« 3/5 dés orange en jeu », « plus grand groupe : 2/3 dés »…) et passe à « réussie » ou « ratée » dès que le résultat est définitif. En fin de partie, chaque recette ratée indique pourquoi.
+  - Sur téléphone, une **barre Recettes** reste en haut du plateau pendant la partie : une pastille par recette, avec son illustration et sa progression (« 3/5 », ✔ réussie, ✘ ratée, ×2 pour les recettes qui doublent un fruit). Un toucher sur la barre ouvre les deux cartes complètes par-dessus le plateau ; ✕, un nouveau toucher sur la barre ou un toucher ailleurs les referme (ce toucher ne déplace pas la carte en main). Quand une recette est réussie, un message et un petit son l'annoncent et sa pastille clignote. Sur ordinateur, les recettes sont dans le panneau de droite, juste sous le score.
   - **Panier de fruits** : la Brouette compte comme un panier, puisqu'elle remplace un Panier recouvert.
 - **Mode compétitif** : le même numéro de partie donne les mêmes cartes, dans le même ordre (lien partageable `?partie=1234&recettes=7,5`).
 
@@ -86,7 +87,7 @@ Le jeton **Brouette** prend la couleur du fruit qui l'a remplie (orange, jaune o
 - Les règles s'ouvrent depuis le menu Ortie (logo en haut à gauche), ou avec la touche « ? » sur ordinateur. Le numéro de version s'affiche dans le menu, les règles et le panneau Détails. Une appli installée se met à jour automatiquement à l'ouverture.
 - Les textes de la barre du bas tiennent toujours sur une ligne : la police rétrécit si besoin, pour que l'écran ne change jamais de taille.
 - Le bouton **Télécharger** disparaît quand l'appli est installée. Sur Chrome, Edge et Android, il n'apparaît que si le navigateur propose vraiment l'installation. Sur iPhone et Safari, qui ne permettent pas de le détecter, le bouton « Elle est déjà installée » du guide le masque ; un lien « installer l'appli » reste dans les règles.
-- Sur téléphone, l'écran est fixe comme une application : le plateau ne bouge jamais pendant qu'on déplace une carte. Le score et la réserve s'affichent en haut ; un toucher ouvre le panneau « Détails » (score, réserve, recettes).
+- Sur téléphone, l'écran est fixe comme une application : le plateau ne bouge jamais pendant qu'on déplace une carte. Le score et la réserve s'affichent en haut ; un toucher ouvre le panneau « Détails » (score, recettes, réserve).
 - Chaque case recouverte affiche le dé obtenu, ou une croix rouge si la pose est interdite. Le nombre de fruits gagnés s'affiche sur la carte et sur le bouton **Poser**.
 - **Conseil** (💡) propose le coup qui rapporte le plus de fruits ce tour-ci.
 - **Annuler** revient sur le dernier coup. La partie est sauvegardée automatiquement.
