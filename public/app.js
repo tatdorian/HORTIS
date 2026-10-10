@@ -4,7 +4,7 @@
   const H = window.OrtieCore;
   const S = 100; // taille d'une case en unités SVG
   const CW = H.CARD_W * S, CH = H.CARD_H * S;
-  const APP_VERSION = '1.16';
+  const APP_VERSION = '1.17';
   const STORE_KEY = 'ortie.save.v3';
   const OLD_STORE_KEY = 'ortie.save.v2';
   const SEEN_KEY = 'ortie.seenRules';
@@ -449,7 +449,7 @@
     fitText(els.boardHelp, narrow ? 12 : 13, 9);
   }
   let fitTimer = 0;
-  window.addEventListener('resize', () => { clearTimeout(fitTimer); fitTimer = setTimeout(() => { fitTexts(); placeRecipeBar(); }, 80); });
+  window.addEventListener('resize', () => { clearTimeout(fitTimer); fitTimer = setTimeout(() => { fitTexts(); layoutOverlays(); }, 80); });
 
   let lastPointerType = 'mouse';
   const touchMode = () => lastPointerType !== 'mouse' || window.matchMedia('(hover: none)').matches;
@@ -561,7 +561,7 @@
     const on = sc.recipes.length > 0;
     document.body.classList.toggle('has-recipes', on);
     els.recipeBar.hidden = !on;
-    if (!on) { closeRecipePop(); return; }
+    if (!on) { closeRecipePop(); layoutOverlays(); return; }
     const flash = ui.recipeFlash || [];
     ui.recipeFlash = null;
     els.recipeBar.innerHTML = sc.recipes.map((x) => {
@@ -583,20 +583,34 @@
       return `<button type="button" class="${cls}" aria-label="${esc(label)}" title="${esc(label)}"><svg viewBox="0 0 80 80" class="rb-ico" aria-hidden="true">${recipeIcon(r)}</svg><span class="rb-txt">${txt}</span>${mark}</button>`;
     }).join('');
     els.recipeBar.classList.toggle('open', !els.recipePop.hidden);
-    placeRecipeBar();
+    layoutOverlays();
     if (!els.recipePop.hidden) fillRecipePop(sc);
   }
 
-  // À deux, la barre passe sous l'étiquette du joueur si elles se touchent.
-  function placeRecipeBar() {
+  // À deux, la pastille du joueur et la barre Recettes restent sur une seule
+  // ligne : on raccourcit le texte de la pastille (puis on resserre les
+  // pastilles Recettes) jusqu'à ce que tout tienne ; en dernier recours, le nom
+  // est coupé par « … ». La barre ne passe jamais en dessous.
+  function layoutOverlays() {
+    const pill = els.playerPill;
     const bar = els.recipeBar;
-    bar.classList.remove('below');
-    if (!bar.hidden && !els.playerPill.hidden) {
-      const a = els.playerPill.getBoundingClientRect();
-      const b = bar.getBoundingClientRect();
-      if (b.width && a.width && a.right + 6 > b.left) bar.classList.add('below');
+    bar.classList.remove('tight');
+    const variants = ui.pillVariants;
+    if (pill.hidden || !variants) return;
+    const nameEl = pill.querySelector('.pp-name');
+    const stEl = pill.querySelector('.pp-st');
+    pill.style.maxWidth = '';
+    const barOn = !bar.hidden && bar.getBoundingClientRect().width > 0;
+    const fits = () => pill.scrollWidth <= pill.clientWidth + 1 && nameEl.scrollWidth <= nameEl.clientWidth + 1 && (!barOn || pill.getBoundingClientRect().right + 8 <= bar.getBoundingClientRect().left);
+    for (const [v, tight] of [[0, false], [1, false], [1, true], [2, true], [3, true]]) {
+      const x = variants[Math.min(v, variants.length - 1)];
+      nameEl.textContent = x.name;
+      stEl.textContent = x.st;
+      stEl.hidden = !x.st;
+      bar.classList.toggle('tight', tight);
+      if (fits()) return;
     }
-    document.body.classList.toggle('rb-below', bar.classList.contains('below'));
+    if (barOn) pill.style.maxWidth = Math.max(64, bar.getBoundingClientRect().left - pill.getBoundingClientRect().left - 8) + 'px';
   }
 
   function fillRecipePop(sc) {
@@ -636,22 +650,36 @@
     const sw = canSwitchView();
     els.whoChip.innerHTML = `<i class="who-dot" style="background:${vp.color}"></i>${esc(vp.name)} · `;
     els.whoMini.style.background = vp.color;
+    // Textes de la pastille, du plus complet au plus court (voir layoutOverlays).
+    const of = (name, sts) => sts.map((st) => ({ name, st }));
+    let color, variants, net = '';
     if (isOnline()) {
       // La pastille montre toujours l'adversaire : où il en est, en direct.
       const op = oppPlayer();
-      let st;
-      if (vi !== match.me) st = 'revenir à mon verger ⇄';
-      else if (op.left) st = 'a quitté la partie';
-      else if (!ui.linkOk) st = 'connexion…';
-      else st = (op.state.over ? 'terminé' : 'carte ' + cardOf(op.state) + '/' + H.GAME_CARDS) + ' · ' + H.score(op.state).total + ' fruits' + (sw ? ' · voir ⇄' : '');
+      const pts = H.score(op.state).total;
+      const arrow = sw ? ' ⇄' : '';
+      color = op.color;
+      if (vi !== match.me) variants = [{ name: 'Verger de ' + op.name, st: 'revenir à mon verger ⇄' }, { name: 'Verger de ' + op.name, st: 'mon verger ⇄' }, { name: op.name, st: '⇄ mon verger' }, { name: op.name, st: '⇄' }];
+      else if (op.left) variants = of(op.name, ['a quitté la partie', 'a quitté', 'parti', 'parti']);
+      else if (!ui.linkOk) variants = of(op.name, ['connexion…', 'connexion…', '…', '…']);
+      else {
+        const n = cardOf(op.state) + '/' + H.GAME_CARDS;
+        variants = of(op.name, op.state.over
+          ? [`terminé · ${pts} fruits${sw ? ' · voir ⇄' : ''}`, `fini · ${pts} fruits${arrow}`, `${pts} fruits${arrow}`, `${pts}${arrow}`]
+          : [`carte ${n} · ${pts} fruits${sw ? ' · voir ⇄' : ''}`, `${n} · ${pts} fruits${arrow}`, `${pts} fruits${arrow}`, `${pts}${arrow}`]);
+      }
       const live = ui.linkOk && op.online && !op.left;
-      els.playerPill.innerHTML = `<i class="who-dot" style="background:${op.color}"></i><b>${vi !== match.me ? 'Verger de ' : ''}${esc(op.name)}</b><span>${st}</span><i class="net-dot${live ? ' on' : ''}" title="${live ? 'En ligne' : 'Hors ligne'}"></i>`;
-      els.playerPill.style.setProperty('--pc', op.color);
+      net = `<i class="net-dot${live ? ' on' : ''}" title="${live ? 'En ligne' : 'Hors ligne'}"></i>`;
     } else {
-      els.playerPill.innerHTML = `<i class="who-dot" style="background:${vp.color}"></i><b>${esc(vp.name)}</b><span>${over ? 'voir l’autre verger ⇄' : vp.state.over ? 'terminé' : 'carte ' + cardOf(vp.state) + '/' + H.GAME_CARDS}</span>`;
-      els.playerPill.style.setProperty('--pc', vp.color);
+      color = vp.color;
+      const n = cardOf(vp.state) + '/' + H.GAME_CARDS;
+      variants = of(vp.name, over ? ['voir l’autre verger ⇄', 'autre verger ⇄', '⇄', '⇄'] : vp.state.over ? ['terminé', 'terminé', 'fini', ''] : ['carte ' + n, n, n, '']);
     }
+    ui.pillVariants = variants;
+    els.playerPill.innerHTML = `<i class="who-dot" style="background:${color}"></i><b class="pp-name"></b><span class="pp-st"></span>${net}`;
+    els.playerPill.style.setProperty('--pc', color);
     els.playerPill.classList.toggle('can-switch', sw);
+    els.playerPill.setAttribute('aria-label', variants[0].name + ' · ' + variants[0].st);
     els.playersList.innerHTML = match.players.map((p, i) => {
       const sc = H.score(p.state);
       const cards = Math.min(p.state.placed.length, H.GAME_CARDS);
@@ -662,6 +690,7 @@
       else tag = i === match.cur ? 'à jouer' : '';
       return `<button type="button" class="pl${i === vi ? ' on' : ''}" data-player="${i}" ${sw ? '' : 'disabled'}><i class="who-dot" style="background:${p.color}"></i><span class="pl-name">${esc(nameOf(i))}</span><span class="pl-tag">${tag}</span><span class="pl-cards">${cards}/${H.GAME_CARDS}</span><b>${sc.total}</b></button>`;
     }).join('');
+    layoutOverlays();
   }
   const nameOf = (i) => match.players[i].name + (isOnline() && i === match.me ? ' (vous)' : '');
 
@@ -1749,6 +1778,8 @@
     try { window.history.replaceState(null, '', location.pathname); } catch (e) { /* ignore */ }
     if (!(isOnline() && match.code === invite)) openOnline('join', invite);
   }
+  // largeurs exactes une fois la police du jeu chargée
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { fitTexts(); layoutOverlays(); });
   window.__ortieReady = true; // le jeu a démarré (voir le garde-fou dans index.html)
   try { sessionStorage.removeItem('ortie.autofix'); } catch (e) { /* ignore */ }
   let seen = false;
