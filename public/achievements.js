@@ -32,8 +32,11 @@
 
   // icon : émoji, ou « svg:… » pour un dessin du jeu (panier, brouette, écureuil).
   // stat / goal : compteur cumulé, affiché comme une progression.
+  // reward : objets exclusifs de Personnaliser, débloqués avec l'achievement
+  //          (kind : board = fond, cards = design des cartes, dice = dés, accent = couleurs).
+  const R = (kind, id, name) => ({ kind, id, name });
   const LIST = [
-    { id: 'premier_verger', cat: 'debut', tier: 'bronze', icon: '🌱', name: 'Premier verger', desc: 'Terminer une partie.' },
+    { id: 'premier_verger', cat: 'debut', tier: 'bronze', icon: '🌱', name: 'Premier verger', desc: 'Terminer une partie.', reward: [R('board', 'checker', 'Damier')] },
     { id: 'verger_complet', cat: 'debut', tier: 'bronze', icon: '🌳', name: 'Verger complet', desc: 'Poser les 9 cartes d’une partie.' },
     { id: 'premier_panier', cat: 'debut', tier: 'bronze', icon: 'svg:basket', name: 'Premier panier', desc: 'Transformer un dé en Panier (10 fruits).' },
     { id: 'brouette', cat: 'debut', tier: 'bronze', icon: 'svg:barrow', name: 'En brouette !', desc: 'Faire entrer la Brouette en jeu.' },
@@ -44,42 +47,60 @@
     { id: 'score_30', cat: 'recolte', tier: 'bronze', icon: '🍊', name: 'Bonne récolte', desc: 'Finir une partie avec 30 fruits ou plus.', score: 30 },
     { id: 'score_45', cat: 'recolte', tier: 'argent', icon: '🍋', name: 'Belle récolte', desc: 'Finir une partie avec 45 fruits ou plus.', score: 45 },
     { id: 'score_55', cat: 'recolte', tier: 'argent', icon: '✨', name: 'Récolte d’exception', desc: 'Finir une partie avec 55 fruits ou plus.', score: 55 },
-    { id: 'score_65', cat: 'recolte', tier: 'or', icon: '🌟', name: 'Corne d’abondance', desc: 'Finir une partie avec 65 fruits ou plus.', score: 65 },
-    { id: 'score_80', cat: 'recolte', tier: 'or', icon: '👑', name: 'Légende du verger', desc: 'Finir une partie avec 80 fruits ou plus.', score: 80 },
-    { id: 'coup_maitre', cat: 'recolte', tier: 'argent', icon: '⚡', name: 'Coup de maître', desc: 'Gagner 15 fruits ou plus en un seul coup.' },
+    { id: 'score_65', cat: 'recolte', tier: 'or', icon: '🌟', name: 'Corne d’abondance', desc: 'Finir une partie avec 65 fruits ou plus.', score: 65, reward: [R('board', 'goldleaf', 'Feuille d’or')] },
+    { id: 'score_80', cat: 'recolte', tier: 'or', icon: '👑', name: 'Légende du verger', desc: 'Finir une partie avec 80 fruits ou plus.', score: 80, reward: [R('cards', 'golden', 'Verger doré')] },
+    { id: 'coup_maitre', cat: 'recolte', tier: 'argent', icon: '⚡', name: 'Coup de maître', desc: 'Gagner 15 fruits ou plus en un seul coup.', reward: [R('cards', 'ember', 'Braises')] },
     { id: 'trois_six', cat: 'recolte', tier: 'argent', icon: '🎲', name: 'Triple six', desc: 'Avoir 3 dés de valeur 6 en jeu en même temps.' },
-    { id: 'panier_garni', cat: 'recolte', tier: 'or', icon: '🧺', name: 'Panier garni', desc: 'Avoir 3 Paniers en jeu en même temps (la Brouette compte).' },
+    { id: 'panier_garni', cat: 'recolte', tier: 'or', icon: '🧺', name: 'Panier garni', desc: 'Avoir 3 Paniers en jeu en même temps (la Brouette compte).', reward: [R('dice', 'gold', 'Or massif')] },
     { id: 'quinze_des', cat: 'recolte', tier: 'or', icon: '🧮', name: 'Rien ne se perd', desc: 'Finir une partie avec les 15 dés en jeu.' },
+    { id: 'score_90', cat: 'recolte', tier: 'or', icon: '🌋', name: 'Verger mythique', desc: 'Finir une partie avec 90 fruits ou plus.', score: 90, reward: [R('dice', 'obsidian', 'Obsidienne')] },
+    { id: 'quatre_six', cat: 'recolte', tier: 'or', icon: '🎰', name: 'Carré de six', desc: 'Avoir 4 dés de valeur 6 en jeu en même temps.' },
+    { id: 'cinq_paniers', cat: 'recolte', tier: 'or', icon: '🏺', name: 'Corbeille royale', desc: 'Avoir 5 Paniers en jeu en même temps (la Brouette compte).' },
     { id: 'zero_pourri', cat: 'recolte', tier: 'argent', icon: '🍃', name: 'Rien ne pourrit', desc: 'Poser les 9 cartes sans laisser de dé sur une clairière.' },
 
     { id: 'objectif', cat: 'recettes', tier: 'argent', icon: '🎯', name: 'Chef pâtissier', desc: 'Atteindre l’objectif d’une partie avec Recettes.' },
-    { id: 'deux_etoiles', cat: 'recettes', tier: 'or', icon: '⭐', name: 'Deux étoiles', desc: 'Réussir les deux recettes à bonus d’une même partie.' },
-    { id: 'objectif_80', cat: 'recettes', tier: 'or', icon: '🏔️', name: 'Objectif ambitieux', desc: 'Atteindre un objectif de 80 ou plus.' },
+    { id: 'deux_etoiles', cat: 'recettes', tier: 'or', icon: '⭐', name: 'Deux étoiles', desc: 'Réussir les deux recettes à bonus d’une même partie.', reward: [R('dice', 'crystal', 'Cristal')] },
+    { id: 'objectif_80', cat: 'recettes', tier: 'or', icon: '🏔️', name: 'Objectif ambitieux', desc: 'Atteindre un objectif de 80 ou plus.', reward: [R('accent', 'minuit', 'Minuit')] },
+    { id: 'grand_cru', cat: 'recettes', tier: 'or', icon: '🍾', name: 'Grand cru', desc: 'Réussir les deux recettes à bonus et dépasser l’objectif de 15 fruits ou plus.' },
+    { id: 'serie_recettes', cat: 'recettes', tier: 'or', icon: '🔥', name: 'Série étoilée', desc: 'Atteindre l’objectif de 5 parties avec Recettes d’affilée.', stat: 'recipeStreakBest', goal: 5 },
     { id: 'livre_recettes', cat: 'recettes', tier: 'argent', icon: '📖', name: 'Livre de recettes', desc: 'Réussir 10 recettes.', stat: 'recipes', goal: 10 },
-    { id: 'grand_chef', cat: 'recettes', tier: 'or', icon: '🎂', name: 'Grand chef', desc: 'Réussir chacune des 14 recettes à bonus au moins une fois.', stat: 'recipeSet', goal: BONUS_RECIPES.length },
+    { id: 'grand_chef', cat: 'recettes', tier: 'or', icon: '🎂', name: 'Grand chef', desc: 'Réussir chacune des 14 recettes à bonus au moins une fois.', stat: 'recipeSet', goal: BONUS_RECIPES.length, reward: [R('cards', 'rainbow', 'Arc-en-ciel')] },
 
-    { id: 'parties_10', cat: 'assiduite', tier: 'bronze', icon: '🌿', name: 'Jardinier assidu', desc: 'Terminer 10 parties.', stat: 'games', goal: 10 },
-    { id: 'parties_50', cat: 'assiduite', tier: 'argent', icon: '🏡', name: 'Arboriculteur passionné', desc: 'Terminer 50 parties.', stat: 'games', goal: 50 },
+    { id: 'parties_10', cat: 'assiduite', tier: 'bronze', icon: '🌿', name: 'Jardinier assidu', desc: 'Terminer 10 parties.', stat: 'games', goal: 10, reward: [R('dice', 'wood', 'Bois')] },
+    { id: 'parties_50', cat: 'assiduite', tier: 'argent', icon: '🏡', name: 'Arboriculteur passionné', desc: 'Terminer 50 parties.', stat: 'games', goal: 50, reward: [R('accent', 'royal', 'Royal')] },
     { id: 'parties_100', cat: 'assiduite', tier: 'or', icon: '🏆', name: 'Une vie au verger', desc: 'Terminer 100 parties.', stat: 'games', goal: 100 },
     { id: 'fruits_1000', cat: 'assiduite', tier: 'argent', icon: '📦', name: 'Mille fruits', desc: 'Récolter 1 000 fruits au total.', stat: 'fruits', goal: 1000 },
     { id: 'fruits_5000', cat: 'assiduite', tier: 'or', icon: '🚜', name: 'Cinq mille fruits', desc: 'Récolter 5 000 fruits au total.', stat: 'fruits', goal: 5000 },
+    { id: 'parties_250', cat: 'assiduite', tier: 'or', icon: '🗿', name: 'Gardien éternel', desc: 'Terminer 250 parties.', stat: 'games', goal: 250 },
+    { id: 'fruits_10000', cat: 'assiduite', tier: 'or', icon: '⛰️', name: 'Dix mille fruits', desc: 'Récolter 10 000 fruits au total.', stat: 'fruits', goal: 10000 },
+    { id: 'jours_30', cat: 'assiduite', tier: 'or', icon: '🗓️', name: 'Un mois au verger', desc: 'Jouer 30 jours différents.', stat: 'days', goal: 30 },
     { id: 'vannier', cat: 'assiduite', tier: 'argent', icon: 'svg:basket', name: 'Vannier', desc: 'Finir des parties avec 25 Paniers en jeu au total (la Brouette compte).', stat: 'baskets', goal: 25 },
-    { id: 'jours_7', cat: 'assiduite', tier: 'argent', icon: '📅', name: 'Fidèle au verger', desc: 'Jouer 7 jours différents.', stat: 'days', goal: 7 },
-    { id: 'sans_filet', cat: 'assiduite', tier: 'argent', icon: '🤸', name: 'Sans filet', desc: 'Poser les 9 cartes sans jamais annuler un coup.' },
+    { id: 'jours_7', cat: 'assiduite', tier: 'argent', icon: '📅', name: 'Fidèle au verger', desc: 'Jouer 7 jours différents.', stat: 'days', goal: 7, reward: [R('board', 'aurora', 'Aurore boréale')] },
+    { id: 'sans_filet', cat: 'assiduite', tier: 'argent', icon: '🤸', name: 'Sans filet', desc: 'Poser les 9 cartes sans jamais annuler un coup.', reward: [R('accent', 'emeraude', 'Émeraude')] },
     { id: 'defi_releve', cat: 'assiduite', tier: 'argent', icon: '🔁', name: 'Défi relevé', desc: 'Rejouer les mêmes cartes et battre son propre score.' },
 
     { id: 'duo', cat: 'multi', tier: 'bronze', icon: '👥', name: 'En famille', desc: 'Terminer une partie à deux sur le même appareil.' },
     { id: 'distance', cat: 'multi', tier: 'bronze', icon: '🌍', name: 'Par-delà les haies', desc: 'Terminer une partie à distance.' },
     { id: 'revanche', cat: 'multi', tier: 'bronze', icon: '🤝', name: 'Revanche !', desc: 'Jouer une revanche à distance.' },
-    { id: 'victoire_distance', cat: 'multi', tier: 'argent', icon: '🥇', name: 'Champion du verger', desc: 'Gagner une partie à distance.' },
+    { id: 'victoire_distance', cat: 'multi', tier: 'argent', icon: '🥇', name: 'Champion du verger', desc: 'Gagner une partie à distance.', reward: [R('board', 'royalvelvet', 'Velours royal')] },
+    { id: 'imbattable', cat: 'multi', tier: 'or', icon: '🛡️', name: 'Imbattable', desc: 'Gagner 5 parties à distance d’affilée.', stat: 'onlineStreakBest', goal: 5 },
     { id: 'victoires_10', cat: 'multi', tier: 'or', icon: '🏅', name: 'Grand champion', desc: 'Gagner 10 parties à distance.', stat: 'onlineWins', goal: 10 },
 
     { id: 'impasse', cat: 'secrets', tier: 'bronze', icon: '🚧', name: 'Impasse', desc: 'Finir une partie bloquée : plus aucune carte ne peut être posée.', secret: true },
-    { id: 'jardin_zen', cat: 'secrets', tier: 'argent', icon: '🧘', name: 'Jardin zen', desc: 'Poser les 9 cartes avec moins de 20 fruits.', secret: true },
-    { id: 'oiseau_nuit', cat: 'secrets', tier: 'bronze', icon: '🦉', name: 'Oiseau de nuit', desc: 'Terminer une partie entre minuit et 5 h du matin.', secret: true },
+    { id: 'jardin_zen', cat: 'secrets', tier: 'argent', icon: '🧘', name: 'Jardin zen', desc: 'Poser les 9 cartes avec moins de 20 fruits.', secret: true, reward: [R('cards', 'frost', 'Givre')] },
+    { id: 'oiseau_nuit', cat: 'secrets', tier: 'bronze', icon: '🦉', name: 'Oiseau de nuit', desc: 'Terminer une partie entre minuit et 5 h du matin.', secret: true, reward: [R('board', 'cosmos', 'Cosmos')] },
     { id: 'egalite', cat: 'secrets', tier: 'argent', icon: '⚖️', name: 'Ex aequo', desc: 'Finir une partie à deux à égalité parfaite.', secret: true },
 
-    { id: 'maitre', cat: 'legende', tier: 'platine', icon: '💎', name: 'Maître d’Ortie', desc: 'Débloquer tous les autres succès.' },
+    { id: 'score_100', cat: 'secrets', tier: 'or', icon: '💯', name: 'Centenaire', desc: 'Finir une partie avec 100 fruits ou plus.', score: 100, secret: true },
+    { id: 'monochrome', cat: 'secrets', tier: 'or', icon: '🎨', name: 'Monochrome', desc: 'Qu’un seul fruit rapporte 40 fruits ou plus dans une partie.', secret: true },
+    { id: 'coup_de_chance', cat: 'secrets', tier: 'argent', icon: '🍀', name: 'Coup de chance', desc: 'Former un Panier avec l’une de vos 3 premières cartes posées.', secret: true },
+    { id: 'duo_choc', cat: 'secrets', tier: 'argent', icon: '🐿️', name: 'Duo de choc', desc: 'Dans une même partie, utiliser l’Écureuil et faire entrer la Brouette.', secret: true },
+    { id: 'sur_le_fil', cat: 'secrets', tier: 'argent', icon: '🪡', name: 'Sur le fil', desc: 'Finir une partie avec Recettes pile sur l’objectif.', secret: true },
+    { id: 'photo_finish', cat: 'secrets', tier: 'argent', icon: '📸', name: 'Photo-finish', desc: 'Gagner une partie à distance d’un seul fruit.', secret: true },
+    { id: 'hesitant', cat: 'secrets', tier: 'bronze', icon: '🤔', name: 'Hésitant', desc: 'Annuler 10 coups dans une même partie.', secret: true },
+    { id: 'leve_tot', cat: 'secrets', tier: 'bronze', icon: '🌅', name: 'Lève-tôt', desc: 'Terminer une partie entre 5 h et 7 h du matin.', secret: true },
+
+    { id: 'maitre', cat: 'legende', tier: 'platine', icon: '💎', name: 'Maître d’Ortie', desc: 'Réussir tous les autres achievements.', reward: [R('cards', 'diamond', 'Diamant'), R('accent', 'diamant', 'Diamant')] },
   ];
   const BY_ID = {};
   for (const a of LIST) BY_ID[a.id] = a;
@@ -89,7 +110,10 @@
       v: 1,
       unlocked: {}, // id → date du déblocage (ms)
       seenAt: 0, // dernière ouverture de la liste (pour les « nouveaux »)
-      stats: { games: 0, orchards: 0, fruits: 0, best: 0, recipes: 0, baskets: 0, days: 0, lastDay: '', duoGames: 0, onlineGames: 0, onlineWins: 0, recipeSet: [], bestBySeed: {} },
+      stats: {
+        games: 0, orchards: 0, fruits: 0, best: 0, recipes: 0, baskets: 0, days: 0, lastDay: '', duoGames: 0, onlineGames: 0, onlineWins: 0,
+        recipeStreak: 0, recipeStreakBest: 0, onlineStreak: 0, onlineStreakBest: 0, recipeSet: [], bestBySeed: {},
+      },
     };
   }
 
@@ -135,8 +159,14 @@
     if (evs.includes('squirrel')) ids.push('ecureuil');
     if (m.res && m.res.gain >= 15) ids.push('coup_maitre');
     const dice = Object.values(m.state.board).filter((e) => e.die && !e.die.barrow);
-    if (dice.filter((e) => e.die.v === 6).length >= 3) ids.push('trois_six');
-    if (basketsOf(m.state) >= 3) ids.push('panier_garni');
+    const sixes = dice.filter((e) => e.die.v === 6).length;
+    if (sixes >= 3) ids.push('trois_six');
+    if (sixes >= 4) ids.push('quatre_six');
+    const baskets = basketsOf(m.state);
+    if (baskets >= 3) ids.push('panier_garni');
+    if (baskets >= 5) ids.push('cinq_paniers');
+    if (evs.includes('basket') && (m.state.placed || []).length <= 4) ids.push('coup_de_chance'); // la 1re carte est posée d'office
+    if (m.state.squirrelUsed && !m.state.barrowFree) ids.push('duo_choc');
     return unlock(d, ids, m.now);
   }
 
@@ -172,8 +202,16 @@
       if (sc.target != null && sc.won) {
         ids.push('objectif');
         if (sc.target >= 80) ids.push('objectif_80');
+        if (done.length === 2 && bonus.length === 2 && sc.total >= sc.target + 15) ids.push('grand_cru');
       }
+      if (sc.target != null && sc.total === sc.target) ids.push('sur_le_fil');
+      if (H.TYPES.some((t) => sc.scored[t] >= 40)) ids.push('monochrome');
+      if (g.undos >= 10) ids.push('hesitant');
       if (g.first) {
+        if (sc.target != null) { // série d'objectifs atteints avec Recettes
+          s.recipeStreak = sc.won ? s.recipeStreak + 1 : 0;
+          s.recipeStreakBest = Math.max(s.recipeStreakBest, s.recipeStreak);
+        }
         s.recipes += done.length;
         for (const r of done) if (!s.recipeSet.includes(r.id)) s.recipeSet.push(r.id);
         s.baskets += basketsOf(st);
@@ -197,17 +235,31 @@
       s.fruits += fruits;
       if (g.day && s.lastDay !== g.day) { s.days++; s.lastDay = g.day; }
       if (g.mode === 'duo') s.duoGames++;
-      if (g.mode === 'online') { s.onlineGames++; if (g.result === 'win') s.onlineWins++; }
+      if (g.mode === 'online') {
+        s.onlineGames++;
+        if (g.result === 'win') s.onlineWins++;
+        s.onlineStreak = g.result === 'win' ? s.onlineStreak + 1 : 0;
+        s.onlineStreakBest = Math.max(s.onlineStreakBest, s.onlineStreak);
+      }
     }
     if (g.mode === 'duo') ids.push('duo');
     if (g.mode === 'online') ids.push('distance');
     if (g.mode === 'online' && g.result === 'win') ids.push('victoire_distance');
+    if (g.mode === 'online' && g.result === 'win' && g.margin === 1) ids.push('photo_finish');
     if (g.mode !== 'solo' && g.result === 'tie') ids.push('egalite');
     if (g.hour != null && g.hour < 5) ids.push('oiseau_nuit');
+    if (g.hour === 5 || g.hour === 6) ids.push('leve_tot');
     return unlock(d, ids, g.now);
   }
 
   const onEvent = (d, id, now) => unlock(d, [id], now);
+
+  // Récompenses : « kind:id » → achievement qui la donne
+  const REWARD_OWNER = {};
+  const REWARDS = [];
+  for (const a of LIST) for (const r of a.reward || []) { REWARD_OWNER[r.kind + ':' + r.id] = a.id; REWARDS.push(Object.assign({ by: a.id }, r)); }
+  const rewardOwner = (kind, id) => REWARD_OWNER[kind + ':' + id] || null;
+  const rewardLocked = (d, kind, id) => { const o = rewardOwner(kind, id); return !!o && !d.unlocked[o]; };
 
   function summary(d) {
     let pts = 0, max = 0, count = 0;
@@ -216,8 +268,9 @@
       max += TIERS[a.tier].pts;
       if (d.unlocked[a.id]) { pts += TIERS[a.tier].pts; count++; tiers[a.tier]++; }
     }
-    return { count, total: LIST.length, pts, max, tiers, fresh: LIST.filter((a) => d.unlocked[a.id] > d.seenAt).length };
+    const rewards = REWARDS.filter((r) => d.unlocked[r.by]).length;
+    return { count, total: LIST.length, pts, max, tiers, rewards, rewardsTotal: REWARDS.length, fresh: LIST.filter((a) => d.unlocked[a.id] > d.seenAt).length };
   }
 
-  return { TIERS, CATEGORIES, LIST, BY_ID, BONUS_RECIPES, newData, normalize, progress, onMove, onGameEnd, onEvent, summary };
+  return { TIERS, CATEGORIES, LIST, BY_ID, BONUS_RECIPES, REWARDS, newData, normalize, progress, onMove, onGameEnd, onEvent, summary, rewardOwner, rewardLocked };
 });

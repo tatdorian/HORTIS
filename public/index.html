@@ -20,7 +20,7 @@
   <!-- Le numéro de version dans l'adresse des fichiers garantit qu'une page neuve
        ne charge jamais un ancien style.css / app.js gardé en cache (téléphone,
        appli installée ou hébergeur). À changer à chaque version (cf. sw.js). -->
-  <link rel="stylesheet" href="style.css?v=1.20">
+  <link rel="stylesheet" href="style.css?v=1.21">
   <script>
     /* Garde-fou silencieux : si le jeu ne démarre pas (ex. un ancien fichier
        resté en cache), on recharge automatiquement la dernière version, une
@@ -264,6 +264,8 @@
         <button type="button" id="btn-custom-random" class="btn ghost">🎲 Au hasard</button>
         <button type="button" id="btn-custom-reset" class="btn ghost">↺ Par défaut</button>
       </div>
+      <p id="custom-lock" class="custom-lock" role="status" hidden></p>
+      <p class="small-note custom-legend">🏆 = récompense d’achievement · 🔒 = à débloquer (menu Ortie → Achievements)</p>
       <h3>Thème</h3>
       <div id="opt-themes" class="opt-grid themes"></div>
       <h3>Couleurs de l’interface</h3>
@@ -401,6 +403,9 @@
       <radialGradient id="g-die-orange" cx=".32" cy=".28" r=".9"><stop offset="0" stop-color="#ffc59c"/><stop offset=".45" stop-color="#f2762e"/><stop offset="1" stop-color="#b44f19"/></radialGradient>
       <radialGradient id="g-die-citron" cx=".32" cy=".28" r=".9"><stop offset="0" stop-color="#fff4b2"/><stop offset=".45" stop-color="#f5d02a"/><stop offset="1" stop-color="#c09706"/></radialGradient>
       <radialGradient id="g-die-vert" cx=".32" cy=".28" r=".9"><stop offset="0" stop-color="#cdf2b6"/><stop offset=".45" stop-color="#5cb544"/><stop offset="1" stop-color="#2e7622"/></radialGradient>
+      <linearGradient id="g-die-wood" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#d6a96d"/><stop offset=".5" stop-color="#b07a42"/><stop offset="1" stop-color="#7d4f22"/></linearGradient>
+      <radialGradient id="g-die-goldpip" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#fff3b0"/><stop offset=".5" stop-color="#e2b52b"/><stop offset="1" stop-color="#9a7410"/></radialGradient>
+      <linearGradient id="g-die-obsidian" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3b3b46"/><stop offset=".55" stop-color="#16161c"/><stop offset="1" stop-color="#050507"/></linearGradient>
       <linearGradient id="g-wood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e9c48e"/><stop offset="1" stop-color="#b98447"/></linearGradient>
       <linearGradient id="g-back" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3f8a3c"/><stop offset="1" stop-color="#235c2c"/></linearGradient>
       <filter id="f-shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#3a2a12" flood-opacity=".35"/></filter>
@@ -454,11 +459,11 @@
 
   <div id="ach-toast" class="ach-toast" popover="manual" role="status" aria-live="polite"></div>
 
-  <script src="core.js?v=1.20"></script>
-  <script src="achievements.js?v=1.20"></script>
-  <script src="sound.js?v=1.20"></script>
-  <script src="online.js?v=1.20"></script>
-  <script src="app.js?v=1.20"></script>
-  <script src="install.js?v=1.20"></script>
+  <script src="core.js?v=1.21"></script>
+  <script src="achievements.js?v=1.21"></script>
+  <script src="sound.js?v=1.21"></script>
+  <script src="online.js?v=1.21"></script>
+  <script src="app.js?v=1.21"></script>
+  <script src="install.js?v=1.21"></script>
 </body>
 </html>

@@ -4,7 +4,7 @@
   const H = window.OrtieCore;
   const S = 100; // taille d'une case en unités SVG
   const CW = H.CARD_W * S, CH = H.CARD_H * S;
-  const APP_VERSION = '1.20';
+  const APP_VERSION = '1.21';
   const STORE_KEY = 'ortie.save.v3';
   const OLD_STORE_KEY = 'ortie.save.v2';
   const SEEN_KEY = 'ortie.seenRules';
@@ -29,12 +29,25 @@
       bush: { back: '#0e4634', l1: '#156b4a', l2: '#1c8056', l3: '#259a63', stroke: '#07301e', r1: '#7fe0b0', r2: '#98e9c0', r3: '#b3f1d1' } },
     vintage: { name: 'Vintage', base: '#cbc291', blobs: ['#d5cd9e', '#beb581', '#d0c899', '#b8ae7a', '#dad3a8'], star: '#fff3cf', dot: '#a0522d', border: '#8f8455', hi: '#eee7c4', num: '#5a4a22',
       bush: { back: '#3b4223', l1: '#535d2f', l2: '#636e39', l3: '#778245', stroke: '#252a13', r1: '#a6b07a', r2: '#b5be8b', r3: '#c5cc9e' } },
+    // Récompenses d'achievements (verrouillés tant que l'achievement n'est pas réussi)
+    ember: { name: 'Braises', base: '#5a2a1c', blobs: ['#6b3020', '#4f2418', '#663022', '#4a2016', '#743626'], star: '#ffb347', dot: '#ff6a2b', border: '#2e140c', hi: '#8a4a30', num: '#ffd2a8',
+      bush: { back: '#1d2a14', l1: '#2e4220', l2: '#3a5228', l3: '#486432', stroke: '#0f1a0a', r1: '#ff8a3d', r2: '#ffa65e', r3: '#ffc38a' } },
+    frost: { name: 'Givre', base: '#cfe6f2', blobs: ['#ddeff8', '#bcdcec', '#d6ebf5', '#b5d6e8', '#e6f4fb'], star: '#ffffff', dot: '#7fb4d6', border: '#8fb8d0', hi: '#f4fbff', num: '#2c5c78',
+      bush: { back: '#1f4a4a', l1: '#2c6464', l2: '#377575', l3: '#468a8a', stroke: '#143434', r1: '#bfe8f0', r2: '#d2f0f5', r3: '#e5f8fb' } },
+    golden: { name: 'Verger doré', base: '#e6c157', blobs: ['#efcf6f', '#d8ad3e', '#ebc865', '#d1a536', '#f4d985'], star: '#fffbe0', dot: '#a8740b', border: '#a8801c', hi: '#fff1b8', num: '#6b4a00',
+      bush: { back: '#2c4a1c', l1: '#3f6a26', l2: '#4d7d2e', l3: '#5f9238', stroke: '#1c3010', r1: '#e8c25a', r2: '#f0d27a', r3: '#f7e3a3' } },
+    rainbow: { name: 'Arc-en-ciel', base: '#c6e8b8', blobs: ['#ffc9d6', '#ffe6a3', '#bff0b5', '#b8dcff', '#e0c7ff'], star: '#ffffff', dot: '#ff5f9e', border: '#8fbf86', hi: '#f6fff2', num: '#3d6b35',
+      bush: { back: '#1d5527', l1: '#2c7a36', l2: '#3a8c3e', l3: '#4b9f45', stroke: '#17451f', r1: '#ffb3c8', r2: '#ffe08a', r3: '#a8d8ff' } },
+    diamond: { name: 'Diamant', base: '#d9e4f5', blobs: ['#e9effa', '#c9d7ee', '#e2eaf8', '#c1d1ea', '#f0f4fc'], star: '#ffffff', dot: '#8fa9e0', border: '#7f97c7', hi: '#ffffff', num: '#3a4f80',
+      bush: { back: '#22344f', l1: '#30486a', l2: '#3a557b', l3: '#486690', stroke: '#141f30', r1: '#cfe0ff', r2: '#dfeaff', r3: '#eef4ff' } },
     winter: { name: 'Hiver', base: '#e2eef1', blobs: ['#f3f9fa', '#d2e3e8', '#ebf4f6', '#d8e7eb', '#f8fcfc'], star: '#ffffff', dot: '#93bfd2', border: '#a6c2cc', hi: '#ffffff', num: '#2e5a6b',
       bush: { back: '#1c473a', l1: '#2a644f', l2: '#357860', l3: '#468d72', stroke: '#133429', r1: '#8fc9b4', r2: '#a6d6c4', r3: '#c0e5d6' } },
   };
   const BOARDS = {
     oak: 'Chêne clair', walnut: 'Noyer', felt: 'Tapis bleu', linen: 'Lin', slate: 'Ardoise', terracotta: 'Tomettes',
     grass: 'Pelouse', marble: 'Marbre', sand: 'Sable', night: 'Nuit étoilée', velvet: 'Velours',
+    // récompenses d'achievements
+    checker: 'Damier', goldleaf: 'Feuille d’or', aurora: 'Aurore boréale', royalvelvet: 'Velours royal', cosmos: 'Cosmos',
   };
   // Couleurs de l'interface (titres, boutons, score). Les couleurs sombres sont dans style.css.
   const ACCENTS = {
@@ -43,9 +56,14 @@
     prune: { name: 'Prune', brand: '#5b3a7a', accent: '#c47f0e' },
     framboise: { name: 'Framboise', brand: '#9b2c4f', accent: '#2a8f82' },
     cacao: { name: 'Cacao', brand: '#6b4a2b', accent: '#3f8f3a' },
+    // récompenses d'achievements
+    emeraude: { name: 'Émeraude', brand: '#0f6b4f', accent: '#e24f6a' },
+    royal: { name: 'Royal', brand: '#4b2a7a', accent: '#c9a227' },
+    minuit: { name: 'Minuit', brand: '#1d2f5c', accent: '#22a6c7' },
+    diamant: { name: 'Diamant', brand: '#3a5a8c', accent: '#9b6bff' },
   };
   // Style des dés : la couleur du fruit reste toujours reconnaissable.
-  const DICE_STYLES = { classic: 'Classique', numbers: 'Chiffres', pastel: 'Pastel', outline: 'Contour', gem: 'Bonbon' };
+  const DICE_STYLES = { classic: 'Classique', numbers: 'Chiffres', pastel: 'Pastel', outline: 'Contour', gem: 'Bonbon', wood: 'Bois', crystal: 'Cristal', gold: 'Or massif', obsidian: 'Obsidienne' };
   const PLAYER_COLORS = ['#f06a32', '#3b7fc4'];
   const THEMES = { auto: 'Automatique', light: 'Clair', dark: 'Sombre' };
   const PREF_DEFAULTS = { theme: 'auto', board: 'oak', cards: 'classic', accent: 'verger', dice: 'classic' };
@@ -199,6 +217,11 @@
       case 'pastel': return Object.assign({ sw: 2.5, shine: 0.3 }, PASTEL[t]);
       case 'outline': return { fill: OUTLINE[t], edge: DIE_EDGE[t], pip: OUTLINE_PIP[t], sw: 4, shine: 0 };
       case 'gem': return { fill: `url(#g-die-${t})`, edge: DIE_EDGE[t], pip: DIE_PIP[t], sw: 2, shine: 0.5, gem: true };
+      // récompenses : la couleur du fruit reste sur le bord et les points
+      case 'wood': return { fill: 'url(#g-die-wood)', edge: DIE_FILL[t], pip: DIE_FILL[t], pipStroke: '#3a2410', sw: 4, shine: 0.12 };
+      case 'crystal': return { fill: DIE_FILL[t], fillOpacity: 0.42, edge: DIE_EDGE[t], pip: DIE_EDGE[t], sw: 2.5, shine: 0.6, gem: true };
+      case 'gold': return { fill: DIE_FILL[t], edge: '#c9a227', pip: 'url(#g-die-goldpip)', pipStroke: '#6b4d00', sw: 4.5, shine: 0.3 };
+      case 'obsidian': return { fill: 'url(#g-die-obsidian)', edge: DIE_FILL[t], pip: DIE_FILL[t], sw: 3.5, shine: 0.1 };
       default: return { fill: DIE_FILL[t], edge: DIE_EDGE[t], pip: DIE_PIP[t], sw: 2.5, shine: 0.2 };
     }
   }
@@ -215,7 +238,8 @@
     const sz = 52;
     const L = dieLook(die.t, style);
     let g = `<g transform="translate(${cx} ${cy}) scale(${sc})"><g class="${cls}" filter="url(#f-shadow)">`;
-    g += `<rect x="${-sz / 2}" y="${-sz / 2}" width="${sz}" height="${sz}" rx="${style === 'gem' ? 14 : 11}" fill="${L.fill}" stroke="${L.edge}" stroke-width="${L.sw}"/>`;
+    if (L.fillOpacity) g += `<rect x="${-sz / 2}" y="${-sz / 2}" width="${sz}" height="${sz}" rx="14" fill="#fff" opacity=".55"/>`;
+    g += `<rect x="${-sz / 2}" y="${-sz / 2}" width="${sz}" height="${sz}" rx="${L.gem ? 14 : 11}" fill="${L.fill}"${L.fillOpacity ? ` fill-opacity="${L.fillOpacity}"` : ''} stroke="${L.edge}" stroke-width="${L.sw}"/>`;
     if (L.gem) g += `<ellipse cx="-9" cy="-13" rx="12" ry="6" fill="#fff" opacity="${L.shine}" transform="rotate(-20 -9 -13)"/>`;
     else if (L.shine) g += `<rect x="${-sz / 2 + 4}" y="${-sz / 2 + 3}" width="${sz - 8}" height="${sz / 2 - 6}" rx="8" fill="#fff" opacity="${L.shine}"/>`;
     if (die.v >= H.BASKET) {
@@ -224,7 +248,8 @@
     } else if (style === 'numbers') {
       g += `<text y="11.5" text-anchor="middle" class="die-big" fill="${L.pip}">${die.v}</text>`;
     } else {
-      for (const [px, py] of PIPS[die.v] || []) g += `<circle cx="${px * 12.5}" cy="${py * 12.5}" r="5.2" fill="${L.pip}"/>`;
+      const ps = L.pipStroke ? ` stroke="${L.pipStroke}" stroke-width="1.3"` : '';
+      for (const [px, py] of PIPS[die.v] || []) g += `<circle cx="${px * 12.5}" cy="${py * 12.5}" r="5.2" fill="${L.pip}"${ps}/>`;
     }
     if (opts.lost) g += `<path d="M-20-20L20 20M20-20L-20 20" stroke="#7a2e1a" stroke-width="5" stroke-linecap="round" opacity=".7"/>`;
     g += `</g></g>`;
@@ -1413,6 +1438,7 @@
     const first = !match.achDone;
     match.achDone = true;
     let result = null;
+    let margin = null;
     if (isMulti()) {
       const [a, b] = match.players.map((p) => H.score(p.state));
       const tie = a.total === b.total && a.dice === b.dice;
@@ -1421,6 +1447,7 @@
       else if (isOnline()) {
         const [mine, other] = match.me === 0 ? [a, b] : [b, a];
         result = mine.total > other.total || (mine.total === other.total && mine.dice > other.dice) ? 'win' : 'lose';
+        margin = mine.total - other.total;
       }
     }
     const d = new Date();
@@ -1428,7 +1455,7 @@
     const ids = A.onGameEnd(ach, {
       mode: isOnline() ? 'online' : isDuo() ? 'duo' : 'solo',
       states: isOnline() ? [myPlayer().state] : match.players.map((p) => p.state),
-      result, undos: match.undos || 0, first, now: d.getTime(), hour: d.getHours(), day,
+      result, margin, undos: match.undos || 0, first, now: d.getTime(), hour: d.getHours(), day,
     });
     save();
     achSaved(ids);
@@ -1443,11 +1470,14 @@
     return `<span class="ach-ico">${a.icon}</span>`;
   }
 
+  const KIND_NAME = { board: 'Fond', cards: 'Cartes', dice: 'Dés', accent: 'Couleurs' };
+  const rewardText = (a) => (a.reward || []).map((r) => `${KIND_NAME[r.kind]} « ${r.name} »`).join(' + ');
+
   function achEndHtml(ids) {
     if (!ids || !ids.length) return '';
     return `<div class="ach-end"><h3>🏆 ${ids.length > 1 ? 'Nouveaux achievements' : 'Nouvel achievement'}</h3>` + ids.map((id) => {
       const a = A.BY_ID[id];
-      return `<div class="ach-chip tier-${a.tier}"><span class="ach-medal">${achIcon(a)}</span><span><b>${a.name}</b><small>${a.desc}</small></span></div>`;
+      return `<div class="ach-chip tier-${a.tier}"><span class="ach-medal">${achIcon(a)}</span><span><b>${a.name}</b><small>${a.desc}</small>${a.reward ? `<small class="ach-gift">🎁 Récompense : ${rewardText(a)}</small>` : ''}</span></div>`;
     }).join('') + '</div>';
   }
 
@@ -1486,11 +1516,12 @@
     const best = list.slice().sort((a, b) => TIER_ORDER.indexOf(a.tier) - TIER_ORDER.indexOf(b.tier))[0];
     el.className = 'ach-toast tier-' + best.tier + (list.length > 1 ? ' multi' : '');
     if (list.length === 1) {
-      el.innerHTML = `<span class="ach-medal">${achIcon(best)}</span><span class="at-txt"><small>🏆 Achievement débloqué ! · ${A.TIERS[best.tier].name}</small><b>${best.name}</b><span class="at-desc">${best.desc}</span></span>`;
+      el.innerHTML = `<span class="ach-medal">${achIcon(best)}</span><span class="at-txt"><small>🏆 Achievement débloqué ! · ${A.TIERS[best.tier].name}</small><b>${best.name}</b><span class="at-desc">${best.desc}</span>${best.reward ? `<span class="at-gift">🎁 Récompense : ${rewardText(best)}</span>` : ''}</span>`;
     } else {
       const more = list.length - 3;
       const names = list.slice(0, 3).map((a) => a.name).join(', ') + (more > 0 ? ` et ${more} autre${more > 1 ? 's' : ''}` : '');
-      el.innerHTML = `<span class="at-txt"><small>🏆 ${list.length} achievements débloqués !</small><span class="at-medals">${list.slice(0, 7).map((a) => `<span class="ach-medal tier-${a.tier}">${achIcon(a)}</span>`).join('')}</span><span class="at-desc">${names}</span></span>`;
+      const gifts = list.reduce((n, a) => n + (a.reward || []).length, 0);
+      el.innerHTML = `<span class="at-txt"><small>🏆 ${list.length} achievements débloqués !</small><span class="at-medals">${list.slice(0, 7).map((a) => `<span class="ach-medal tier-${a.tier}">${achIcon(a)}</span>`).join('')}</span><span class="at-desc">${names}</span>${gifts ? `<span class="at-gift">🎁 ${gifts} récompense${gifts > 1 ? 's' : ''} à découvrir dans Personnaliser</span>` : ''}</span>`;
     }
     el.setAttribute('aria-label', list.length === 1 ? 'Achievement débloqué : ' + best.name : list.length + ' achievements débloqués');
     try { if (el.showPopover && !popOpen(el)) el.showPopover(); } catch (e) { /* navigateur sans popover */ }
@@ -1507,7 +1538,7 @@
 
   function achBadge() {
     const s = A.summary(ach);
-    els.menuAchSub.textContent = `${s.count} / ${s.total} réussis · ${fmt(s.pts)} points`;
+    els.menuAchSub.innerHTML = `${s.count} / ${s.total} réussis · ${fmt(s.pts)} points · 🎁 ${s.rewards} / ${s.rewardsTotal}<span class="mi-bar"><i style="width:${Math.round((100 * s.count) / s.total)}%"></i></span>`;
     els.menuAchNew.hidden = !s.fresh;
     els.menuAchNew.textContent = s.fresh + (s.fresh > 1 ? ' nouveaux' : ' nouveau');
     const badge = document.querySelector('.menu-badge');
@@ -1521,7 +1552,7 @@
     const pct = Math.round((100 * s.count) / s.total);
     els.achSummary.innerHTML = `<div class="as-top"><div class="as-main"><b>${s.count}</b><span>/ ${s.total} réussis</span></div><div class="as-pts"><b>${fmt(s.pts)}</b> / ${fmt(s.max)} points</div></div>`
       + `<div class="bar"><span style="width:${pct}%"></span></div>`
-      + `<div class="as-tiers">${Object.entries(A.TIERS).map(([t, T]) => `<span class="tier-${t}"><i></i>${s.tiers[t]} ${T.name.toLowerCase()}</span>`).join('')}</div>`;
+      + `<div class="as-tiers">${Object.entries(A.TIERS).map(([t, T]) => `<span class="tier-${t}"><i></i>${s.tiers[t]} ${T.name.toLowerCase()}</span>`).join('')}<span class="as-gifts">🎁 ${s.rewards} / ${s.rewardsTotal} récompenses</span></div>`;
     let h = '';
     for (const [cat, title] of A.CATEGORIES) {
       const inCat = A.LIST.filter((a) => a.cat === cat);
@@ -1537,7 +1568,7 @@
         else if (p) foot = `<span class="ach-prog"><i style="width:${Math.round((100 * p.cur) / p.goal)}%"></i></span><em>${fmt(p.cur)} / ${fmt(p.goal)}</em>`;
         h += `<div class="ach-card tier-${a.tier}${t ? ' done' : ''}${t && t > achSeen ? ' new' : ''}">`
           + `<span class="ach-medal">${achIcon(a, !t)}</span>`
-          + `<div class="ach-txt"><b>${hidden ? 'Achievement secret' : a.name}</b><small>${hidden ? 'Continuez à jouer pour le découvrir…' : a.desc}</small>${foot}</div>`
+          + `<div class="ach-txt"><b>${hidden ? 'Achievement secret' : a.name}</b><small>${hidden ? 'Continuez à jouer pour le découvrir…' : a.desc}</small>${a.reward ? `<small class="ach-gift">🎁 ${t ? 'Obtenu' : 'Récompense'} : ${hidden ? 'surprise' : rewardText(a)}</small>` : ''}${foot}</div>`
           + `<span class="ach-tier">${A.TIERS[a.tier].name}</span></div>`;
       }
       h += '</div>';
@@ -1887,18 +1918,49 @@
     if (meta) meta.setAttribute('content', dark ? '#171b14' : ACCENTS[prefs.accent].brand);
   }
   try { darkQuery.addEventListener('change', applyPrefs); } catch (e) { /* ancien Safari */ }
+  // Objets exclusifs : verrouillés tant que l'achievement qui les donne n'est pas réussi.
+  const KIND_PREF = { board: 'board', cards: 'cards', dice: 'dice', accent: 'accent' };
+  const isLocked = (kind, id) => A.rewardLocked(ach, kind, id);
+  function lockBadge(kind, id) {
+    if (!isLocked(kind, id)) return A.rewardOwner(kind, id) ? '<span class="opt-reward" title="Récompense d’achievement">🏆</span>' : '';
+    return '<span class="opt-lock" aria-hidden="true">🔒</span>';
+  }
+  function optAttrs(kind, id, on) {
+    const locked = isLocked(kind, id);
+    return `class="opt${on ? ' on' : ''}${locked ? ' locked' : ''}" aria-pressed="${on}"${locked ? ' aria-disabled="true"' : ''}`;
+  }
+  // Toucher un objet verrouillé : on explique comment l'obtenir.
+  function lockedHint(kind, id) {
+    if (!isLocked(kind, id)) return false;
+    const a = A.BY_ID[A.rewardOwner(kind, id)];
+    const el = $('custom-lock');
+    el.innerHTML = `🔒 Récompense de l’achievement <b>${a.secret ? 'secret' : '« ' + a.name + ' »'}</b>${a.secret ? '' : ' : ' + a.desc}`;
+    el.hidden = false;
+    el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+    sfx('bad');
+    return true;
+  }
+  // Données effacées ou objet pas (encore) obtenu : retour au style par défaut.
+  function checkLockedPrefs() {
+    let changed = false;
+    for (const k of Object.keys(KIND_PREF)) if (isLocked(k, prefs[KIND_PREF[k]])) { prefs[KIND_PREF[k]] = PREF_DEFAULTS[KIND_PREF[k]]; changed = true; }
+    if (changed) savePrefs();
+    return changed;
+  }
+
   function renderCustom() {
+    $('custom-lock').hidden = true;
     els.optThemes.innerHTML = Object.entries(THEMES).map(([id, name]) =>
       `<button type="button" class="opt${prefs.theme === id ? ' on' : ''}" data-theme-opt="${id}" aria-pressed="${prefs.theme === id}"><span class="theme-swatch" data-t="${id}"><i></i><i></i><i></i></span><span class="opt-name">${name}</span></button>`).join('');
     els.optBoards.innerHTML = Object.entries(BOARDS).map(([id, name]) =>
-      `<button type="button" class="opt${prefs.board === id ? ' on' : ''}" data-board-opt="${id}" aria-pressed="${prefs.board === id}"><span class="swatch" data-board="${id}"></span><span class="opt-name">${name}</span></button>`).join('');
+      `<button type="button" ${optAttrs('board', id, prefs.board === id)} data-board-opt="${id}"><span class="swatch" data-board="${id}"></span>${lockBadge('board', id)}<span class="opt-name">${name}</span></button>`).join('');
     els.optCards.innerHTML = Object.entries(CARD_THEMES).map(([id, T]) =>
-      `<button type="button" class="opt${prefs.cards === id ? ' on' : ''}" data-card-opt="${id}" aria-pressed="${prefs.cards === id}"><svg viewBox="-6 -4 312 212" aria-hidden="true">${cardArt(H.cardById(9), id)}</svg><span class="opt-name">${T.name}</span></button>`).join('');
-    els.optAccents.innerHTML = Object.entries(ACCENTS).map(([id, A]) =>
-      `<button type="button" class="opt${prefs.accent === id ? ' on' : ''}" data-accent-opt="${id}" aria-pressed="${prefs.accent === id}"><span class="accent-swatch" style="--b:${A.brand};--a:${A.accent}"><i></i><i></i></span><span class="opt-name">${A.name}</span></button>`).join('');
+      `<button type="button" ${optAttrs('cards', id, prefs.cards === id)} data-card-opt="${id}"><svg viewBox="-6 -4 312 212" aria-hidden="true">${cardArt(H.cardById(9), id)}</svg>${lockBadge('cards', id)}<span class="opt-name">${T.name}</span></button>`).join('');
+    els.optAccents.innerHTML = Object.entries(ACCENTS).map(([id, C]) =>
+      `<button type="button" ${optAttrs('accent', id, prefs.accent === id)} data-accent-opt="${id}"><span class="accent-swatch" style="--b:${C.brand};--a:${C.accent}"><i></i><i></i></span>${lockBadge('accent', id)}<span class="opt-name">${C.name}</span></button>`).join('');
     const dice = (st) => [['orange', 5, -58], ['citron', 3, 0], ['vert', 6, 58]].map(([t, v, x]) => dieSvg({ t, v }, x, 0, { scale: 0.92, style: st })).join('');
     els.optDice.innerHTML = Object.entries(DICE_STYLES).map(([id, name]) =>
-      `<button type="button" class="opt${prefs.dice === id ? ' on' : ''}" data-dice-opt="${id}" aria-pressed="${prefs.dice === id}"><svg viewBox="-92 -34 184 70" aria-hidden="true">${dice(id)}</svg><span class="opt-name">${name}</span></button>`).join('');
+      `<button type="button" ${optAttrs('dice', id, prefs.dice === id)} data-dice-opt="${id}"><svg viewBox="-92 -34 184 70" aria-hidden="true">${dice(id)}</svg>${lockBadge('dice', id)}<span class="opt-name">${name}</span></button>`).join('');
   }
   function customChanged() {
     savePrefs(); applyPrefs(); renderCustom(); renderAll(); renderLegend(); achStyle();
@@ -1951,35 +2013,35 @@
   });
   els.optBoards.addEventListener('click', (e) => {
     const b = e.target.closest('[data-board-opt]');
-    if (!b) return;
+    if (!b || lockedHint('board', b.dataset.boardOpt)) return;
     prefs.board = b.dataset.boardOpt;
     savePrefs(); applyPrefs(); renderCustom(); achStyle();
   });
   els.optCards.addEventListener('click', (e) => {
     const b = e.target.closest('[data-card-opt]');
-    if (!b) return;
+    if (!b || lockedHint('cards', b.dataset.cardOpt)) return;
     prefs.cards = b.dataset.cardOpt;
     savePrefs(); renderCustom(); renderAll(); renderLegend(); achStyle();
   });
   els.optAccents.addEventListener('click', (e) => {
     const b = e.target.closest('[data-accent-opt]');
-    if (!b) return;
+    if (!b || lockedHint('accent', b.dataset.accentOpt)) return;
     prefs.accent = b.dataset.accentOpt;
     customChanged();
   });
   els.optDice.addEventListener('click', (e) => {
     const b = e.target.closest('[data-dice-opt]');
-    if (!b) return;
+    if (!b || lockedHint('dice', b.dataset.diceOpt)) return;
     prefs.dice = b.dataset.diceOpt;
     customChanged();
   });
   // Au hasard : nouvelle combinaison (le thème clair / sombre ne change pas).
-  const pickOther = (obj, cur) => { const k = Object.keys(obj).filter((x) => x !== cur); return k[Math.floor(Math.random() * k.length)]; };
+  const pickOther = (kind, obj, cur) => { const k = Object.keys(obj).filter((x) => x !== cur && !isLocked(kind, x)); return k[Math.floor(Math.random() * k.length)] || cur; };
   $('btn-custom-random').addEventListener('click', () => {
-    prefs.board = pickOther(BOARDS, prefs.board);
-    prefs.cards = pickOther(CARD_THEMES, prefs.cards);
-    prefs.accent = pickOther(ACCENTS, prefs.accent);
-    prefs.dice = pickOther(DICE_STYLES, prefs.dice);
+    prefs.board = pickOther('board', BOARDS, prefs.board);
+    prefs.cards = pickOther('cards', CARD_THEMES, prefs.cards);
+    prefs.accent = pickOther('accent', ACCENTS, prefs.accent);
+    prefs.dice = pickOther('dice', DICE_STYLES, prefs.dice);
     customChanged();
     sfx('rotate');
   });
@@ -2046,6 +2108,7 @@
     try { window.history.replaceState(null, '', location.pathname); } catch (e) { /* ignore */ }
     if (!(isOnline() && match.code === invite)) openOnline('join', invite);
   }
+  if (checkLockedPrefs()) { applyPrefs(); renderAll(); renderLegend(); }
   achBadge();
   achStyle();
   // Outils de test (jamais visibles pour le joueur) : localStorage « ortie.debug » = 1

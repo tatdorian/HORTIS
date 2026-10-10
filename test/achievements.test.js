@@ -44,7 +44,7 @@ test('données abîmées ou anciennes : on repart proprement', () => {
 
 test('pendant la partie : panier, brouette, écureuil, gros coup, triple six, panier garni', () => {
   const d = A.newData();
-  const st = { board: {} };
+  const st = { board: {}, placed: [1, 2, 3, 4, 5, 6], barrowFree: true, squirrelUsed: false };
   let got = A.onMove(d, { state: st, res: { gain: 3, changes: [{ event: 'basket' }] }, now: 1 });
   assert.deepStrictEqual(got, ['premier_panier']);
   got = A.onMove(d, { state: st, res: { gain: 16, changes: [{ event: 'barrow' }, { event: 'squirrel' }] }, now: 2 });
@@ -149,4 +149,66 @@ test('platine : tous les autres succès débloquent « Maître d’Ortie » ; po
   assert.strictEqual(s.pts, s.max);
   d.seenAt = 5;
   assert.strictEqual(A.summary(d).fresh, 2); // styliste et maitre, débloqués après la dernière visite
+});
+
+test('achievements difficiles et secrets : carré de six, corbeille royale, coup de chance, duo de choc', () => {
+  const d = A.newData();
+  const six = (t) => ({ die: { t, v: 6 } });
+  let st = { board: { a: six('orange'), b: six('vert'), c: six('citron'), e: six('orange') }, placed: [1, 2, 3, 4, 5, 6], squirrelUsed: false, barrowFree: true };
+  assert.deepStrictEqual(A.onMove(d, { state: st, res: { gain: 0, changes: [] } }).sort(), ['quatre_six', 'trois_six']);
+  const bk = (t) => ({ die: { t, v: 10 } });
+  st = { board: { a: bk('orange'), b: bk('vert'), c: bk('citron'), e: bk('orange'), f: { die: { t: 'vert', v: 15, barrow: true } } }, placed: [1, 2, 3], squirrelUsed: true, barrowFree: false };
+  const got = A.onMove(d, { state: st, res: { gain: 4, changes: [{ event: 'basket' }] } });
+  for (const id of ['cinq_paniers', 'panier_garni', 'coup_de_chance', 'duo_choc', 'premier_panier']) assert.ok(got.includes(id), id);
+  // Panier formé à la 5e carte : pas de « coup de chance »
+  const d2 = A.newData();
+  assert.ok(!A.onMove(d2, { state: { board: {}, placed: [1, 2, 3, 4, 5], squirrelUsed: false, barrowFree: true }, res: { gain: 1, changes: [{ event: 'basket' }] } }).includes('coup_de_chance'));
+});
+
+test('fin de partie : sur le fil, monochrome, hésitant, lève-tôt, photo-finish, séries', () => {
+  const st = playGame('4242', [13, 2]);
+  const sc = H.score(st);
+  // pile sur l'objectif : on ajuste l'objectif de la partie à son score
+  const d = A.newData();
+  const exact = Object.assign({}, st);
+  const r1 = H.RECIPE_BY_ID[13];
+  const keep = r1.target;
+  r1.target = keep + (sc.total - sc.target);
+  assert.ok(end(d, { states: [exact] }).includes('sur_le_fil'));
+  r1.target = keep;
+  // hésitant (10 annulations) et lève-tôt (6 h)
+  const got = end(A.newData(), { states: [st], undos: 10, hour: 6 });
+  assert.ok(got.includes('hesitant') && got.includes('leve_tot') && !got.includes('sans_filet'));
+  // monochrome : un fruit à 40 ou plus
+  assert.strictEqual(end(A.newData(), { states: [st] }).includes('monochrome'), H.TYPES.some((t) => sc.scored[t] >= 40));
+  // photo-finish : victoire à distance d'un seul fruit
+  assert.ok(end(A.newData(), { mode: 'online', states: [st], result: 'win', margin: 1 }).includes('photo_finish'));
+  assert.ok(!end(A.newData(), { mode: 'online', states: [st], result: 'win', margin: 3 }).includes('photo_finish'));
+  // séries : 5 victoires à distance d'affilée ; une défaite remet à zéro
+  const d3 = A.newData();
+  for (let i = 0; i < 4; i++) end(d3, { mode: 'online', states: [st], result: 'win' });
+  end(d3, { mode: 'online', states: [st], result: 'lose' });
+  assert.strictEqual(d3.stats.onlineStreak, 0);
+  assert.ok(!d3.unlocked.imbattable);
+  for (let i = 0; i < 5; i++) end(d3, { mode: 'online', states: [st], result: 'win' });
+  assert.ok(d3.unlocked.imbattable);
+  assert.strictEqual(d3.stats.onlineStreakBest, 5);
+});
+
+test('récompenses : chaque objet exclusif appartient à un achievement et se débloque avec lui', () => {
+  const d = A.newData();
+  assert.ok(A.REWARDS.length >= 15);
+  const keys = new Set();
+  for (const r of A.REWARDS) {
+    assert.ok(['board', 'cards', 'dice', 'accent'].includes(r.kind), r.id);
+    assert.ok(!keys.has(r.kind + ':' + r.id), 'doublon ' + r.id);
+    keys.add(r.kind + ':' + r.id);
+    assert.strictEqual(A.rewardOwner(r.kind, r.id), r.by);
+    assert.ok(A.rewardLocked(d, r.kind, r.id));
+  }
+  assert.strictEqual(A.rewardOwner('board', 'oak'), null); // objets de base : jamais verrouillés
+  assert.ok(!A.rewardLocked(d, 'board', 'oak'));
+  end(d, { states: [playGame('4242')] }); // premier verger → fond « Damier »
+  assert.ok(!A.rewardLocked(d, 'board', 'checker'));
+  assert.strictEqual(A.summary(d).rewards >= 1, true);
 });
