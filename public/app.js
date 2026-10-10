@@ -4,7 +4,7 @@
   const H = window.OrtieCore;
   const S = 100; // taille d'une case en unités SVG
   const CW = H.CARD_W * S, CH = H.CARD_H * S;
-  const APP_VERSION = '1.18';
+  const APP_VERSION = '1.19';
   const STORE_KEY = 'ortie.save.v3';
   const OLD_STORE_KEY = 'ortie.save.v2';
   const SEEN_KEY = 'ortie.seenRules';
@@ -21,13 +21,35 @@
       bush: { back: '#3b4f1e', l1: '#55702a', l2: '#6a8534', l3: '#82993f', stroke: '#283612', r1: '#a7bb6a', r2: '#b9c97e', r3: '#cbd893' } },
     night: { name: 'Nuit', base: '#2c5a49', blobs: ['#346753', '#275243', '#31624f', '#244c3e', '#3a6f59'], star: '#ffe86f', dot: '#8fd0ff', border: '#173a2e', hi: '#5c977d', num: '#dff3c8',
       bush: { back: '#0f3020', l1: '#1d4f31', l2: '#26603c', l3: '#31744a', stroke: '#08200f', r1: '#5f9e72', r2: '#74b285', r3: '#8cc69a' } },
+    cherry: { name: 'Cerisier', base: '#f2c7d3', blobs: ['#f7d6df', '#ebb6c6', '#f4cfda', '#e8afc0', '#fae0e7'], star: '#ffffff', dot: '#d9487a', border: '#cf8aa1', hi: '#fff0f4', num: '#8a2f50',
+      bush: { back: '#264f2b', l1: '#367039', l2: '#448345', l3: '#579a54', stroke: '#193b1d', r1: '#f0a9be', r2: '#f5bfcf', r3: '#f9d3de' } },
+    lavender: { name: 'Lavande', base: '#cdc2e8', blobs: ['#d8cff0', '#c0b3df', '#d3c9ed', '#b9abda', '#e0d8f4'], star: '#ffffff', dot: '#7b55c7', border: '#9a88c9', hi: '#f1ecfc', num: '#4a3680',
+      bush: { back: '#2a4736', l1: '#3b674a', l2: '#487a57', l3: '#5a8f67', stroke: '#1b3125', r1: '#b6a2e4', r2: '#c7b6ec', r3: '#d8ccf3' } },
+    tropical: { name: 'Tropical', base: '#52c3a7', blobs: ['#62ceb3', '#43b498', '#5bc9ae', '#3daa90', '#6dd6bc'], star: '#fff6a0', dot: '#ff7a59', border: '#2b8f78', hi: '#aaeedb', num: '#0f5446',
+      bush: { back: '#0e4634', l1: '#156b4a', l2: '#1c8056', l3: '#259a63', stroke: '#07301e', r1: '#7fe0b0', r2: '#98e9c0', r3: '#b3f1d1' } },
+    vintage: { name: 'Vintage', base: '#cbc291', blobs: ['#d5cd9e', '#beb581', '#d0c899', '#b8ae7a', '#dad3a8'], star: '#fff3cf', dot: '#a0522d', border: '#8f8455', hi: '#eee7c4', num: '#5a4a22',
+      bush: { back: '#3b4223', l1: '#535d2f', l2: '#636e39', l3: '#778245', stroke: '#252a13', r1: '#a6b07a', r2: '#b5be8b', r3: '#c5cc9e' } },
     winter: { name: 'Hiver', base: '#e2eef1', blobs: ['#f3f9fa', '#d2e3e8', '#ebf4f6', '#d8e7eb', '#f8fcfc'], star: '#ffffff', dot: '#93bfd2', border: '#a6c2cc', hi: '#ffffff', num: '#2e5a6b',
       bush: { back: '#1c473a', l1: '#2a644f', l2: '#357860', l3: '#468d72', stroke: '#133429', r1: '#8fc9b4', r2: '#a6d6c4', r3: '#c0e5d6' } },
   };
-  const BOARDS = { oak: 'Chêne clair', walnut: 'Noyer', felt: 'Tapis bleu', linen: 'Lin', slate: 'Ardoise', terracotta: 'Tomettes' };
+  const BOARDS = {
+    oak: 'Chêne clair', walnut: 'Noyer', felt: 'Tapis bleu', linen: 'Lin', slate: 'Ardoise', terracotta: 'Tomettes',
+    grass: 'Pelouse', marble: 'Marbre', sand: 'Sable', night: 'Nuit étoilée', velvet: 'Velours',
+  };
+  // Couleurs de l'interface (titres, boutons, score). Les couleurs sombres sont dans style.css.
+  const ACCENTS = {
+    verger: { name: 'Verger', brand: '#2f6b3a', accent: '#f06a32' },
+    ocean: { name: 'Océan', brand: '#1f5f8b', accent: '#e2603f' },
+    prune: { name: 'Prune', brand: '#5b3a7a', accent: '#c47f0e' },
+    framboise: { name: 'Framboise', brand: '#9b2c4f', accent: '#2a8f82' },
+    cacao: { name: 'Cacao', brand: '#6b4a2b', accent: '#3f8f3a' },
+  };
+  // Style des dés : la couleur du fruit reste toujours reconnaissable.
+  const DICE_STYLES = { classic: 'Classique', numbers: 'Chiffres', pastel: 'Pastel', outline: 'Contour', gem: 'Bonbon' };
   const PLAYER_COLORS = ['#f06a32', '#3b7fc4'];
   const THEMES = { auto: 'Automatique', light: 'Clair', dark: 'Sombre' };
-  const prefs = { theme: 'auto', board: 'oak', cards: 'classic', names: ['', ''], onlineName: '', sound: { music: true, sfx: true, musicVol: 0.4, sfxVol: 0.7 } };
+  const PREF_DEFAULTS = { theme: 'auto', board: 'oak', cards: 'classic', accent: 'verger', dice: 'classic' };
+  const prefs = { theme: 'auto', board: 'oak', cards: 'classic', accent: 'verger', dice: 'classic', names: ['', ''], onlineName: '', sound: { music: true, sfx: true, musicVol: 0.4, sfxVol: 0.7 } };
   try {
     const saved = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
     Object.assign(prefs, saved, { sound: Object.assign({}, prefs.sound, saved.sound || {}) });
@@ -39,6 +61,8 @@
   if (!BOARDS[prefs.board]) prefs.board = 'oak';
   if (!THEMES[prefs.theme]) prefs.theme = 'auto';
   if (!CARD_THEMES[prefs.cards]) prefs.cards = 'classic';
+  if (!ACCENTS[prefs.accent]) prefs.accent = 'verger';
+  if (!DICE_STYLES[prefs.dice]) prefs.dice = 'classic';
   function savePrefs() { try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch (e) { /* ignore */ } }
 
   const COLOR = { orange: '#f06a32', citron: '#f4cf22', vert: '#5fbf4a' };
@@ -62,7 +86,7 @@
     inSeed: $('in-seed'), inRecipes: $('in-recipes'), inR1: $('in-r1'), inR2: $('in-r2'), recipePick: $('recipe-pick'),
     endTitle: $('end-title'), endBody: $('end-body'), legend: $('legend'), defs: $('defs'),
     btnMenu: $('btn-menu'), dlgMenu: $('dlg-menu'), menuInstall: $('menu-install'),
-    dlgCustom: $('dlg-custom'), optBoards: $('opt-boards'), optCards: $('opt-cards'), optThemes: $('opt-themes'), dlgSettings: $('dlg-settings'),
+    dlgCustom: $('dlg-custom'), optBoards: $('opt-boards'), optCards: $('opt-cards'), optThemes: $('opt-themes'), optAccents: $('opt-accents'), optDice: $('opt-dice'), dlgSettings: $('dlg-settings'),
     dlgTurn: $('dlg-turn'), turnBody: $('turn-body'),
     inModeSolo: $('in-mode-solo'), inModeDuo: $('in-mode-duo'), duoNames: $('duo-names'), inP1: $('in-p1'), inP2: $('in-p2'),
     players: $('players'), playersList: $('players-list'), playerPill: $('player-pill'), whoChip: $('who-chip'), whoMini: $('who-mini'),
@@ -160,8 +184,26 @@
 
   const PIPS = { 1: [[0, 0]], 2: [[-1, -1], [1, 1]], 3: [[-1, -1], [0, 0], [1, 1]], 4: [[-1, -1], [1, -1], [-1, 1], [1, 1]], 5: [[-1, -1], [1, -1], [0, 0], [-1, 1], [1, 1]], 6: [[-1, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [1, 1]] };
 
+  // Couleurs d'un dé selon le style choisi (Personnaliser → Style des dés).
+  const PASTEL = {
+    orange: { fill: '#f9bb92', edge: '#d98a5c', pip: '#6b3a17' },
+    citron: { fill: '#f8e48c', edge: '#cdb14a', pip: '#5e4b07' },
+    vert: { fill: '#b4e09f', edge: '#7fb468', pip: '#2f5a22' },
+  };
+  const OUTLINE = { orange: '#fff1e6', citron: '#fff9db', vert: '#eef8e8' };
+  const OUTLINE_PIP = { orange: '#e8641f', citron: '#c99a00', vert: '#3f9a2e' };
+  function dieLook(t, style) {
+    switch (style) {
+      case 'pastel': return Object.assign({ sw: 2.5, shine: 0.3 }, PASTEL[t]);
+      case 'outline': return { fill: OUTLINE[t], edge: DIE_EDGE[t], pip: OUTLINE_PIP[t], sw: 4, shine: 0 };
+      case 'gem': return { fill: `url(#g-die-${t})`, edge: DIE_EDGE[t], pip: DIE_PIP[t], sw: 2, shine: 0.5, gem: true };
+      default: return { fill: DIE_FILL[t], edge: DIE_EDGE[t], pip: DIE_PIP[t], sw: 2.5, shine: 0.2 };
+    }
+  }
+
   function dieSvg(die, cx, cy, opts) {
     opts = opts || {};
+    const style = opts.style || prefs.dice;
     const sc = opts.scale || 1;
     const cls = 'die' + (opts.cls ? ' ' + opts.cls : '');
     if (die.barrow) {
@@ -169,14 +211,18 @@
       return `<g transform="translate(${cx} ${cy}) scale(${sc})"><g class="${cls}" filter="url(#f-shadow)"><g transform="translate(-31 -31) scale(.97)">${barrowArt(die.t)}</g><g transform="translate(22 22)"><circle r="13" fill="#fffaf0" stroke="${edge}" stroke-width="2"/><text y="5" text-anchor="middle" class="die-num">15</text></g></g></g>`;
     }
     const sz = 52;
+    const L = dieLook(die.t, style);
     let g = `<g transform="translate(${cx} ${cy}) scale(${sc})"><g class="${cls}" filter="url(#f-shadow)">`;
-    g += `<rect x="${-sz / 2}" y="${-sz / 2}" width="${sz}" height="${sz}" rx="11" fill="${DIE_FILL[die.t]}" stroke="${DIE_EDGE[die.t]}" stroke-width="2.5"/>`;
-    g += `<rect x="${-sz / 2 + 4}" y="${-sz / 2 + 3}" width="${sz - 8}" height="${sz / 2 - 6}" rx="8" fill="#fff" opacity=".2"/>`;
+    g += `<rect x="${-sz / 2}" y="${-sz / 2}" width="${sz}" height="${sz}" rx="${style === 'gem' ? 14 : 11}" fill="${L.fill}" stroke="${L.edge}" stroke-width="${L.sw}"/>`;
+    if (L.gem) g += `<ellipse cx="-9" cy="-13" rx="12" ry="6" fill="#fff" opacity="${L.shine}" transform="rotate(-20 -9 -13)"/>`;
+    else if (L.shine) g += `<rect x="${-sz / 2 + 4}" y="${-sz / 2 + 3}" width="${sz - 8}" height="${sz / 2 - 6}" rx="8" fill="#fff" opacity="${L.shine}"/>`;
     if (die.v >= H.BASKET) {
       g += `<g transform="translate(0 4)"><use href="#basket"/></g>`;
-      g += `<g transform="translate(18 -18)"><circle r="11" fill="#fffaf0" stroke="${DIE_EDGE[die.t]}" stroke-width="2"/><text y="4.5" text-anchor="middle" class="die-num small">10</text></g>`;
+      g += `<g transform="translate(18 -18)"><circle r="11" fill="#fffaf0" stroke="${L.edge}" stroke-width="2"/><text y="4.5" text-anchor="middle" class="die-num small">10</text></g>`;
+    } else if (style === 'numbers') {
+      g += `<text y="11.5" text-anchor="middle" class="die-big" fill="${L.pip}">${die.v}</text>`;
     } else {
-      for (const [px, py] of PIPS[die.v] || []) g += `<circle cx="${px * 12.5}" cy="${py * 12.5}" r="5.2" fill="${DIE_PIP[die.t]}"/>`;
+      for (const [px, py] of PIPS[die.v] || []) g += `<circle cx="${px * 12.5}" cy="${py * 12.5}" r="5.2" fill="${L.pip}"/>`;
     }
     if (opts.lost) g += `<path d="M-20-20L20 20M20-20L-20 20" stroke="#7a2e1a" stroke-width="5" stroke-linecap="round" opacity=".7"/>`;
     g += `</g></g>`;
@@ -330,9 +376,7 @@
     const v = ui.view;
     setViewBox([v.minX * S, v.minY * S, (v.maxX - v.minX) * S, (v.maxY - v.minY) * S]);
     ui.animateView = false;
-    let g = '<g class="grid">';
-    for (let y = v.minY; y <= v.maxY; y++) for (let x = v.minX; x <= v.maxX; x++) g += `<circle cx="${x * S}" cy="${y * S}" r="3.5"/>`;
-    g += '</g>';
+    let g = ''; // fond du terrain uni : pas de points de repère
     state.placed.forEach((p, i) => {
       const fresh = ui.fresh && i === state.placed.length - 1;
       g += placedCardSvg(p.id, p.rot, p.x, p.y, fresh ? 'fresh' : '');
@@ -1655,7 +1699,8 @@
     if (prefs.theme === 'auto') root.removeAttribute('data-theme'); else root.dataset.theme = prefs.theme;
     const dark = prefs.theme === 'dark' || (prefs.theme === 'auto' && darkQuery.matches);
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', dark ? '#171b14' : '#2f6b3a');
+    if (prefs.accent === 'verger') root.removeAttribute('data-accent'); else root.dataset.accent = prefs.accent;
+    if (meta) meta.setAttribute('content', dark ? '#171b14' : ACCENTS[prefs.accent].brand);
   }
   try { darkQuery.addEventListener('change', applyPrefs); } catch (e) { /* ancien Safari */ }
   function renderCustom() {
@@ -1665,6 +1710,14 @@
       `<button type="button" class="opt${prefs.board === id ? ' on' : ''}" data-board-opt="${id}" aria-pressed="${prefs.board === id}"><span class="swatch" data-board="${id}"></span><span class="opt-name">${name}</span></button>`).join('');
     els.optCards.innerHTML = Object.entries(CARD_THEMES).map(([id, T]) =>
       `<button type="button" class="opt${prefs.cards === id ? ' on' : ''}" data-card-opt="${id}" aria-pressed="${prefs.cards === id}"><svg viewBox="-6 -4 312 212" aria-hidden="true">${cardArt(H.cardById(9), id)}</svg><span class="opt-name">${T.name}</span></button>`).join('');
+    els.optAccents.innerHTML = Object.entries(ACCENTS).map(([id, A]) =>
+      `<button type="button" class="opt${prefs.accent === id ? ' on' : ''}" data-accent-opt="${id}" aria-pressed="${prefs.accent === id}"><span class="accent-swatch" style="--b:${A.brand};--a:${A.accent}"><i></i><i></i></span><span class="opt-name">${A.name}</span></button>`).join('');
+    const dice = (st) => [['orange', 5, -58], ['citron', 3, 0], ['vert', 6, 58]].map(([t, v, x]) => dieSvg({ t, v }, x, 0, { scale: 0.92, style: st })).join('');
+    els.optDice.innerHTML = Object.entries(DICE_STYLES).map(([id, name]) =>
+      `<button type="button" class="opt${prefs.dice === id ? ' on' : ''}" data-dice-opt="${id}" aria-pressed="${prefs.dice === id}"><svg viewBox="-92 -34 184 70" aria-hidden="true">${dice(id)}</svg><span class="opt-name">${name}</span></button>`).join('');
+  }
+  function customChanged() {
+    savePrefs(); applyPrefs(); renderCustom(); renderAll(); renderLegend();
   }
   function openCustom() { renderCustom(); openDialog(els.dlgCustom); }
   function openSettings() { renderSound(); openDialog(els.dlgSettings); }
@@ -1720,6 +1773,33 @@
     if (!b) return;
     prefs.cards = b.dataset.cardOpt;
     savePrefs(); renderCustom(); renderAll(); renderLegend();
+  });
+  els.optAccents.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-accent-opt]');
+    if (!b) return;
+    prefs.accent = b.dataset.accentOpt;
+    customChanged();
+  });
+  els.optDice.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-dice-opt]');
+    if (!b) return;
+    prefs.dice = b.dataset.diceOpt;
+    customChanged();
+  });
+  // Au hasard : nouvelle combinaison (le thème clair / sombre ne change pas).
+  const pickOther = (obj, cur) => { const k = Object.keys(obj).filter((x) => x !== cur); return k[Math.floor(Math.random() * k.length)]; };
+  $('btn-custom-random').addEventListener('click', () => {
+    prefs.board = pickOther(BOARDS, prefs.board);
+    prefs.cards = pickOther(CARD_THEMES, prefs.cards);
+    prefs.accent = pickOther(ACCENTS, prefs.accent);
+    prefs.dice = pickOther(DICE_STYLES, prefs.dice);
+    customChanged();
+    sfx('rotate');
+  });
+  $('btn-custom-reset').addEventListener('click', () => {
+    Object.assign(prefs, PREF_DEFAULTS);
+    customChanged();
+    sfx('ui');
   });
   els.dlgRules.addEventListener('close', () => { try { localStorage.setItem(SEEN_KEY, '1'); } catch (e) { /* ignore */ } });
 

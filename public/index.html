@@ -20,7 +20,7 @@
   <!-- Le numéro de version dans l'adresse des fichiers garantit qu'une page neuve
        ne charge jamais un ancien style.css / app.js gardé en cache (téléphone,
        appli installée ou hébergeur). À changer à chaque version (cf. sw.js). -->
-  <link rel="stylesheet" href="style.css?v=1.18">
+  <link rel="stylesheet" href="style.css?v=1.19">
   <script>
     /* Garde-fou silencieux : si le jeu ne démarre pas (ex. un ancien fichier
        resté en cache), on recharge automatiquement la dernière version, une
@@ -235,12 +235,20 @@
   <dialog id="dlg-custom" class="dlg custom">
     <form method="dialog">
       <h2>Personnaliser</h2>
+      <div class="custom-quick">
+        <button type="button" id="btn-custom-random" class="btn ghost">🎲 Au hasard</button>
+        <button type="button" id="btn-custom-reset" class="btn ghost">↺ Par défaut</button>
+      </div>
       <h3>Thème</h3>
       <div id="opt-themes" class="opt-grid themes"></div>
+      <h3>Couleurs de l’interface</h3>
+      <div id="opt-accents" class="opt-grid accents"></div>
       <h3>Fond du terrain</h3>
       <div id="opt-boards" class="opt-grid boards"></div>
       <h3>Design des cartes</h3>
       <div id="opt-cards" class="opt-grid cards"></div>
+      <h3>Style des dés</h3>
+      <div id="opt-dice" class="opt-grid dice"></div>
       <p class="small-note">Vos choix sont gardés sur cet appareil.</p>
       <div class="dlg-actions"><button value="ok" class="btn primary">Terminé</button></div>
     </form>
@@ -365,6 +373,9 @@
       <radialGradient id="g-orange" cx="35%" cy="30%" r="75%"><stop offset="0" stop-color="#ffb07a"/><stop offset=".5" stop-color="#f06a32"/><stop offset="1" stop-color="#c9461a"/></radialGradient>
       <radialGradient id="g-citron" cx="35%" cy="30%" r="75%"><stop offset="0" stop-color="#fff6a8"/><stop offset=".5" stop-color="#f6d52b"/><stop offset="1" stop-color="#d6ac0a"/></radialGradient>
       <radialGradient id="g-vert" cx="35%" cy="30%" r="75%"><stop offset="0" stop-color="#b9ec8c"/><stop offset=".5" stop-color="#5fbf4a"/><stop offset="1" stop-color="#3b8f35"/></radialGradient>
+      <radialGradient id="g-die-orange" cx=".32" cy=".28" r=".9"><stop offset="0" stop-color="#ffc59c"/><stop offset=".45" stop-color="#f2762e"/><stop offset="1" stop-color="#b44f19"/></radialGradient>
+      <radialGradient id="g-die-citron" cx=".32" cy=".28" r=".9"><stop offset="0" stop-color="#fff4b2"/><stop offset=".45" stop-color="#f5d02a"/><stop offset="1" stop-color="#c09706"/></radialGradient>
+      <radialGradient id="g-die-vert" cx=".32" cy=".28" r=".9"><stop offset="0" stop-color="#cdf2b6"/><stop offset=".45" stop-color="#5cb544"/><stop offset="1" stop-color="#2e7622"/></radialGradient>
       <linearGradient id="g-wood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e9c48e"/><stop offset="1" stop-color="#b98447"/></linearGradient>
       <linearGradient id="g-back" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3f8a3c"/><stop offset="1" stop-color="#235c2c"/></linearGradient>
       <filter id="f-shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#3a2a12" flood-opacity=".35"/></filter>
@@ -416,10 +427,10 @@
     </defs>
   </svg>
 
-  <script src="core.js?v=1.18"></script>
-  <script src="sound.js?v=1.18"></script>
-  <script src="online.js?v=1.18"></script>
-  <script src="app.js?v=1.18"></script>
-  <script src="install.js?v=1.18"></script>
+  <script src="core.js?v=1.19"></script>
+  <script src="sound.js?v=1.19"></script>
+  <script src="online.js?v=1.19"></script>
+  <script src="app.js?v=1.19"></script>
+  <script src="install.js?v=1.19"></script>
 </body>
 </html>

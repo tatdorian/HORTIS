@@ -23,7 +23,7 @@ Ortie est une application web installable (PWA). Le bouton **Télécharger**, en
 
 Une fois installée, Ortie s'ouvre en plein écran depuis l'écran d'accueil ou le menu Démarrer, et fonctionne **hors connexion** grâce au service worker (`public/sw.js`).
 
-**Mises à jour fiables.** Les fichiers du jeu sont chargés avec leur numéro de version (`style.css?v=1.18`, `app.js?v=1.18`…). Une nouvelle page ne peut donc jamais utiliser un ancien style ou un ancien code resté en cache, que ce soit sur le téléphone, dans l'appli installée ou chez l'hébergeur. **À chaque nouvelle version, changer le numéro à trois endroits** : `APP_VERSION` dans `app.js`, `VERSION` dans `sw.js` et les `?v=` de `index.html` (six fichiers, dont `sound.js` et `online.js`). Un test (`npm test`) vérifie qu'ils sont identiques. Le serveur revalide les fichiers par empreinte de contenu (ETag), pas par date. Si le jeu ne démarre pas, l'appli vide son cache et se recharge toute seule, une seule fois. L'option « Vider le cache et recharger » existe aussi dans le menu Ortie → Paramètres. L'installation exige que le site soit servi en **https** (c'est le cas sur Railway, Coolify, etc.).
+**Mises à jour fiables.** Les fichiers du jeu sont chargés avec leur numéro de version (`style.css?v=1.19`, `app.js?v=1.19`…). Une nouvelle page ne peut donc jamais utiliser un ancien style ou un ancien code resté en cache, que ce soit sur le téléphone, dans l'appli installée ou chez l'hébergeur. **À chaque nouvelle version, changer le numéro à trois endroits** : `APP_VERSION` dans `app.js`, `VERSION` dans `sw.js` et les `?v=` de `index.html` (six fichiers, dont `sound.js` et `online.js`). Un test (`npm test`) vérifie qu'ils sont identiques. Le serveur revalide les fichiers par empreinte de contenu (ETag), pas par date. Si le jeu ne démarre pas, l'appli vide son cache et se recharge toute seule, une seule fois. L'option « Vider le cache et recharger » existe aussi dans le menu Ortie → Paramètres. L'installation exige que le site soit servi en **https** (c'est le cas sur Railway, Coolify, etc.).
 
 ## Déploiement avec Nixpacks
 
@@ -62,10 +62,12 @@ Le menu est rangé en quatre sections séparées : **Jouer** (partie solo, à de
   - Mêmes 9 cartes pour les deux, chacun pose ses cartes **à son rythme**, sans attendre l'autre. En haut du plateau, la pastille de l'adversaire montre en direct sa carte, son score et s'il est en ligne (point vert).
   - Une fois son verger terminé, on peut toucher la pastille pour suivre le verger de l'autre en direct. Quand les deux ont fini, le résultat s'affiche chez les deux joueurs ; « Revanche » relance une manche avec de nouvelles cartes, « Rejouer ces cartes » avec les mêmes.
   - On peut fermer l'appli ou recharger la page : la partie reprend où elle en était. « Annuler » fonctionne pour ses propres coups. Le serveur vérifie chaque coup avec le moteur de règles. Une nouvelle partie solo ou à deux quitte la partie à distance (l'adversaire le voit).
-- **Personnaliser** :
+- **Personnaliser** (boutons « 🎲 Au hasard » pour une combinaison surprise et « ↺ Par défaut ») :
   - **Thème** : automatique (comme le téléphone), clair ou sombre.
-  - **Fond du terrain** : chêne clair, noyer, tapis bleu, lin, ardoise, tomettes.
-  - **Design des cartes** : classique, printemps, automne, nuit, hiver.
+  - **Couleurs de l'interface** : Verger, Océan, Prune, Framboise, Cacao (titres, boutons, score ; adaptées au thème sombre).
+  - **Fond du terrain** : chêne clair, noyer, tapis bleu, lin, ardoise, tomettes, pelouse, marbre, sable, nuit étoilée, velours.
+  - **Design des cartes** : classique, printemps, automne, nuit, cerisier, lavande, tropical, vintage, hiver.
+  - **Style des dés** : classique, chiffres (le nombre au lieu des points), pastel, contour, bonbon. La couleur du fruit reste toujours reconnaissable.
 - **Paramètres** :
   - **Son** : musique douce et effets sonores, chacun désactivable, avec son propre volume.
   - **Application** : « Vider le cache et recharger », numéro de version.
