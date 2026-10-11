@@ -4,7 +4,7 @@
   const H = window.OrtieCore;
   const S = 100; // taille d'une case en unités SVG
   const CW = H.CARD_W * S, CH = H.CARD_H * S;
-  const APP_VERSION = '1.26';
+  const APP_VERSION = '1.27';
   const STORE_KEY = 'ortie.save.v3';
   const OLD_STORE_KEY = 'ortie.save.v2';
   const SEEN_KEY = 'ortie.seenRules';
@@ -98,7 +98,7 @@
     recipes: $('recipes'), recipeList: $('recipe-list'), recipeBar: $('recipe-bar'), recipePop: $('recipe-pop'), seed: $('seed-label'), turn: $('turn-label'),
     hint: $('hint'), toast: $('toast'),
     btnNew: $('btn-new'), btnPlace: $('btn-place'),
-    placeLabel: $('place-label'), placeGain: $('place-gain'),
+    placeLabel: $('place-label'),
     btnRotL: $('btn-rot-l'), btnRotR: $('btn-rot-r'),
     dlgNew: $('dlg-new'), dlgEnd: $('dlg-end'), dlgRules: $('dlg-rules'), dlgSquirrel: $('dlg-squirrel'),
     inSeed: $('in-seed'), inRecipes: $('in-recipes'), inR1: $('in-r1'), inR2: $('in-r2'), recipePick: $('recipe-pick'),
@@ -444,19 +444,12 @@
     for (const ch of ev.changes) {
       if (!ch.covered) continue;
       const cx = ch.x * S + S / 2, cy = ch.y * S + S / 2;
+      // Seulement si la pose est possible : ni gain, ni aperçu des dés (au joueur de calculer).
       if (ch.conflict) {
         g += `<g class="mark bad" transform="translate(${cx} ${cy})"><circle r="22"/><path d="M-9-9L9 9M9-9L-9 9"/></g>`;
-      } else if (ch.die && ev.ok) {
-        g += dieSvg(ch.die, cx, cy, { scale: ch.cell.k === 'clear' ? 0.6 : 0.72, cls: 'ghost-die' });
       } else if (ch.squirrel) {
         g += `<g class="ghost-die">${squirrelSvg(cx, cy, 0.8)}</g>`;
-      } else if (ch.event === 'nodie') {
-        g += `<g class="mark none" transform="translate(${cx} ${cy})"><circle r="18"/><path d="M-12 12L12-12"/></g>`;
       }
-    }
-    if (ev.ok) {
-      const gx = (ui.pos.x + fp.w) * S - 8, gy = ui.pos.y * S + 8;
-      g += `<g class="gain-pill ${ev.gain > 0 ? 'pos' : ''}" transform="translate(${gx} ${gy})"><rect x="-56" y="-20" width="64" height="40" rx="20"/><text x="-24" y="8" text-anchor="middle">${ev.gain > 0 ? '+' : ''}${ev.gain}</text></g>`;
     }
     host.innerHTML = g;
     updateControls(ev);
@@ -468,9 +461,9 @@
     els.btnPlace.disabled = !(ev && ev.ok);
     els.btnPlace.classList.toggle('warn', !!(ev && ev.ok && ev.usesSquirrel));
     els.placeLabel.textContent = ev && ev.ok && ev.usesSquirrel ? 'Poser avec l’Écureuil' : 'Poser';
-    els.placeGain.textContent = ev && ev.ok ? (ev.gain > 0 ? '+' : '') + ev.gain : '';
     let msg, cls = '';
-    if (state.over) msg = 'Partie terminée. Lancez une nouvelle partie quand vous voulez.';
+    if (isOnline() && viewedIndex() !== match.me) msg = `Lecture seule : vous regardez le verger de ${oppPlayer().name}.`;
+    else if (state.over) msg = 'Partie terminée. Lancez une nouvelle partie quand vous voulez.';
     else if (!sel) msg = state.placed.length === 1 ? 'Choisissez une carte de votre main pour commencer.' : 'Choisissez votre prochaine carte.';
     else if (!ev) msg = touchMode() ? 'Touchez le verger (ou glissez la carte) pour la placer.' : 'Survolez le verger pour placer la carte.';
     else if (ev.ok) {
@@ -503,16 +496,10 @@
     fitText(els.hint, narrow ? 13 : 14, 9);
     const L = els.placeLabel;
     const clipped = () => L.scrollWidth > L.clientWidth + 1;
-    els.placeGain.style.display = '';
     fitText(L, narrow ? 16 : 17, 11);
-    // Écran très étroit : libellé court, puis gain masqué (il reste affiché sur la carte),
-    // plutôt qu'un texte coupé ou un bouton qui change de taille.
+    // Écran très étroit : libellé court plutôt qu'un texte coupé ou un bouton qui change de taille.
     if (clipped() && L.textContent === 'Poser avec l’Écureuil') {
       L.textContent = 'Poser (Écureuil)';
-      fitText(L, narrow ? 16 : 17, 10);
-    }
-    if (clipped()) {
-      els.placeGain.style.display = 'none';
       fitText(L, narrow ? 16 : 17, 10);
     }
     fitText(els.boardHelp, narrow ? 12 : 13, 9);
@@ -667,6 +654,7 @@
     if (pill.hidden || !variants) return;
     const nameEl = pill.querySelector('.pp-name');
     const stEl = pill.querySelector('.pp-st');
+    const tagEl = pill.querySelector('.pp-tag');
     pill.style.maxWidth = '';
     const barOn = !bar.hidden && bar.getBoundingClientRect().width > 0;
     const fits = () => pill.scrollWidth <= pill.clientWidth + 1 && nameEl.scrollWidth <= nameEl.clientWidth + 1 && (!barOn || pill.getBoundingClientRect().right + 8 <= bar.getBoundingClientRect().left);
@@ -675,6 +663,8 @@
       nameEl.textContent = x.name;
       stEl.textContent = x.st;
       stEl.hidden = !x.st;
+      tagEl.textContent = x.tag || '';
+      tagEl.hidden = !x.tag;
       bar.classList.toggle('tight', tight);
       if (fits()) return;
     }
@@ -711,7 +701,7 @@
     els.playerPill.hidden = !multi;
     els.whoChip.hidden = !multi;
     els.whoMini.hidden = !multi;
-    if (!multi) return;
+    if (!multi) { renderViewBanner(null); return; }
     const vi = viewedIndex();
     const vp = match.players[vi];
     const over = allOver();
@@ -719,7 +709,8 @@
     els.whoChip.innerHTML = `<i class="who-dot" style="background:${vp.color}"></i>${esc(vp.name)} · `;
     els.whoMini.style.background = vp.color;
     // Textes de la pastille, du plus complet au plus court (voir layoutOverlays).
-    const of = (name, sts) => sts.map((st) => ({ name, st }));
+    const of = (name, sts, tags) => sts.map((st, i) => ({ name, st, tag: tags ? tags[i] : '' }));
+    const viewingOther = isOnline() && vi !== match.me;
     let color, variants, net = '';
     if (isOnline()) {
       // La pastille montre toujours l'adversaire : où il en est, en direct.
@@ -727,25 +718,29 @@
       const pts = H.score(op.state).total;
       const arrow = sw ? ' ⇄' : '';
       color = op.color;
-      if (vi !== match.me) variants = [{ name: 'Verger de ' + op.name, st: 'revenir à mon verger ⇄' }, { name: 'Verger de ' + op.name, st: 'mon verger ⇄' }, { name: op.name, st: '⇄ mon verger' }, { name: op.name, st: '⇄' }];
-      else if (op.left) variants = of(op.name, ['a quitté la partie', 'a quitté', 'parti', 'parti']);
-      else if (!ui.linkOk) variants = of(op.name, ['connexion…', 'connexion…', '…', '…']);
+      const ADV = ['Adversaire', 'Adv.', 'VS', 'VS']; // toujours dit : c'est l'autre joueur, pas ce verger
+      if (vi !== match.me) variants = [{ name: '👁 Verger de ' + op.name, st: '' }, { name: '👁 Verger de ' + op.name, st: '' }, { name: '👁 ' + op.name, st: '' }, { name: op.name, st: '' }];
+      else if (op.left) variants = of(op.name, ['a quitté la partie', 'a quitté', 'parti', 'parti'], ADV);
+      else if (!ui.linkOk) variants = of(op.name, ['connexion…', 'connexion…', '…', '…'], ADV);
       else {
         const n = cardOf(op.state) + '/' + H.GAME_CARDS;
         variants = of(op.name, op.state.over
           ? [`terminé · ${pts} fruits${sw ? ' · voir ⇄' : ''}`, `fini · ${pts} fruits${arrow}`, `${pts} fruits${arrow}`, `${pts}${arrow}`]
-          : [`carte ${n} · ${pts} fruits${sw ? ' · voir ⇄' : ''}`, `${n} · ${pts} fruits${arrow}`, `${pts} fruits${arrow}`, `${pts}${arrow}`]);
+          : [`carte ${n} · ${pts} fruits${sw ? ' · voir ⇄' : ''}`, `${n} · ${pts} fruits${arrow}`, `${pts} fruits${arrow}`, `${pts}${arrow}`], ADV);
       }
       const live = ui.linkOk && op.online && !op.left;
       net = `<i class="net-dot${live ? ' on' : ''}" title="${live ? 'En ligne' : 'Hors ligne'}"></i>`;
     } else {
       color = vp.color;
       const n = cardOf(vp.state) + '/' + H.GAME_CARDS;
-      variants = of(vp.name, over ? ['voir l’autre verger ⇄', 'autre verger ⇄', '⇄', '⇄'] : vp.state.over ? ['terminé', 'terminé', 'fini', ''] : ['carte ' + n, n, n, '']);
+      // en fin de partie, le bandeau du bas dit à qui est le verger et permet de passer à l'autre
+      variants = of(vp.name, over ? ['', '', '', ''] : vp.state.over ? ['terminé', 'terminé', 'fini', ''] : ['carte ' + n, n, n, '']);
     }
     ui.pillVariants = variants;
-    els.playerPill.innerHTML = `<i class="who-dot" style="background:${color}"></i><b class="pp-name"></b><span class="pp-st"></span>${net}`;
+    els.playerPill.innerHTML = `<i class="who-dot" style="background:${color}"></i><small class="pp-tag" hidden></small><b class="pp-name"></b><span class="pp-st"></span>${net}`;
     els.playerPill.style.setProperty('--pc', color);
+    els.playerPill.classList.toggle('viewing', viewingOther);
+    renderViewBanner(vi, vp, viewingOther);
     els.playerPill.classList.toggle('can-switch', sw);
     els.playerPill.setAttribute('aria-label', variants[0].name + ' · ' + variants[0].st);
     els.playersList.innerHTML = match.players.map((p, i) => {
@@ -761,6 +756,26 @@
     layoutOverlays();
   }
   const nameOf = (i) => match.players[i].name + (isOnline() && i === match.me ? ' (vous)' : '');
+
+  // À qui est le verger affiché ? Cadre à la couleur du propriétaire ; bandeau
+  // quand on regarde le verger de l'autre (à distance) ou en fin de partie à deux.
+  function renderViewBanner(vi, vp, viewingOther) {
+    const banner = $('view-banner');
+    document.body.classList.toggle('viewing-other', !!viewingOther);
+    if (vi == null) { banner.hidden = true; els.boardWrap.style.removeProperty('--owner'); return; }
+    els.boardWrap.style.setProperty('--owner', vp.color);
+    banner.style.setProperty('--owner', vp.color);
+    const other = match.players[1 - vi];
+    let txt = null, btn = null;
+    if (viewingOther) { txt = `👁 Vous regardez le verger de <b>${esc(vp.name)}</b>`; btn = '↩ Mon verger'; }
+    else if (isDuo() && allOver()) { txt = `Verger de <b>${esc(vp.name)}</b> · ${H.score(vp.state).total} fruits`; btn = `Voir ${esc(other.name)} ⇄`; }
+    banner.hidden = !txt;
+    if (txt) { $('view-banner-txt').innerHTML = txt; $('btn-view-back').innerHTML = btn; }
+  }
+  $('btn-view-back').addEventListener('click', () => {
+    if (isOnline()) viewPlayer(match.me);
+    else viewPlayer(1 - viewedIndex());
+  });
 
   // Regarder le verger d'un autre joueur (en lecture seule).
   function viewPlayer(i) {
@@ -1228,7 +1243,7 @@
     closeRecipePop();
     if (e.target.closest('.board-wrap')) ui.swallowBoard = true;
   }, true);
-  const OVERLAY = '.player-pill, .recipe-bar, .recipe-pop';
+  const OVERLAY = '.player-pill, .recipe-bar, .recipe-pop, .view-banner';
 
   // Doigt : glisser = déplacer la carte, toucher = l'amener ici, double toucher = tourner.
   els.boardWrap.addEventListener('touchstart', (e) => {

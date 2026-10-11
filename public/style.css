@@ -146,11 +146,8 @@ body.kbd .brand:focus-visible { outline: 3px solid var(--accent); outline-offset
 .btn.icon { width: 44px; height: 44px; padding: 0; font-size: 22px; background: var(--surface); border-color: var(--line); color: var(--brand); }
 .btn.big { min-height: 52px; height: 52px; padding: 0 22px; font-size: 17px; white-space: nowrap; min-width: 0; }
 #place-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 0 1 auto; }
-.btn.big .gain { flex: none; }
 .install-link { color: var(--brand); font-weight: 700; text-decoration: underline; }
 .btn .ico { font-size: 16px; line-height: 1; }
-.gain { background: rgba(255,255,255,.25); border-radius: 999px; padding: 1px 9px; font-size: 15px; }
-.gain:empty { display: none; }
 .rot-group { display: flex; gap: 6px; }
 
 /* ------------------------------------------------------------ Mise en page */
@@ -295,11 +292,6 @@ body[data-board="cosmos"] .board-wrap, .swatch[data-board="cosmos"] {
 .board .ghost-die { opacity: .96; }
 .board .mark.bad circle { fill: rgba(220, 60, 35, .9); stroke: #fff; stroke-width: 3; }
 .board .mark.bad path { stroke: #fff; stroke-width: 5; stroke-linecap: round; }
-.board .mark.none circle { fill: rgba(60, 60, 60, .55); stroke: #fff; stroke-width: 2; }
-.board .mark.none path { stroke: #fff; stroke-width: 4; stroke-linecap: round; }
-.board .gain-pill rect { fill: rgba(34, 48, 31, .9); stroke: #fff; stroke-width: 2.5; }
-.board .gain-pill.pos rect { fill: #2e8b48; }
-.board .gain-pill text { fill: #fff; font: 800 24px 'Nunito', sans-serif; }
 .board .fresh, .board .pop, .board .ghost-card { transform-box: fill-box; transform-origin: center; }
 .board .ghost-card.spin-r { animation: spin-r .22s ease-out; }
 .board .ghost-card.spin-l { animation: spin-l .22s ease-out; }
@@ -970,3 +962,27 @@ svg .die-big { font: 800 31px 'Nunito', sans-serif; }
 .code-row .code-input { flex: 1; min-width: 0; font: inherit; padding: 10px 12px; border-radius: 12px; border: 2px solid var(--line); background: var(--surface-2); color: var(--ink); min-height: 44px; }
 .o-paste { flex: none; min-height: 44px; padding: 0 12px; font-size: 14px; }
 a.btn { text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
+
+/* À deux : à qui est le verger affiché ? Cadre à la couleur de son propriétaire,
+   bandeau « Vous regardez le verger de … » quand ce n'est pas le sien. */
+body.duo .board-wrap::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 1;
+  box-shadow: inset 0 0 0 4px var(--owner, transparent);
+}
+body.viewing-other .board-wrap::after {
+  box-shadow: inset 0 0 0 7px var(--owner, transparent);
+  background: color-mix(in srgb, var(--owner, transparent) 10%, transparent);
+}
+.view-banner {
+  position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 3; display: flex; align-items: center; gap: 10px;
+  padding: 8px 8px 8px 14px; border-radius: 16px; background: var(--owner, #22301f); color: #fff;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .3); font-weight: 700; font-size: 14px; line-height: 1.25;
+}
+.view-banner > span { flex: 1; min-width: 0; }
+.view-banner b { font-weight: 900; }
+.view-banner .btn { flex: none; min-height: 38px; padding: 0 12px; font-size: 14px; background: #fff; color: #22301f; border: 0; }
+body.viewing-other .tray .hand, body.viewing-other .tray .actions, body.viewing-other .tray .deck { opacity: .35; pointer-events: none; filter: grayscale(.4); }
+.player-pill .pp-tag { flex: none; font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .4px; color: #8a8470; }
+.player-pill.viewing { background: var(--pc); color: #fff; box-shadow: 0 3px 10px rgba(0, 0, 0, .25); }
+.player-pill.viewing span, .player-pill.viewing .pp-tag { color: rgba(255, 255, 255, .85); }
+.player-pill.viewing .who-dot { box-shadow: 0 0 0 2px #fff; }
