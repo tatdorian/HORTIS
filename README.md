@@ -23,7 +23,7 @@ Ortie est une application web installable (PWA). Le bouton **Télécharger**, en
 
 Une fois installée, Ortie s'ouvre en plein écran depuis l'écran d'accueil ou le menu Démarrer, et fonctionne **hors connexion** grâce au service worker (`public/sw.js`).
 
-**Mises à jour fiables.** Les fichiers du jeu sont chargés avec leur numéro de version (`style.css?v=1.24`, `app.js?v=1.24`…). Une nouvelle page ne peut donc jamais utiliser un ancien style ou un ancien code resté en cache, que ce soit sur le téléphone, dans l'appli installée ou chez l'hébergeur. **À chaque nouvelle version, changer le numéro à trois endroits** : `APP_VERSION` dans `app.js`, `VERSION` dans `sw.js` et les `?v=` de `index.html` (sept fichiers, dont `sound.js`, `online.js` et `achievements.js`). Un test (`npm test`) vérifie qu'ils sont identiques. Le serveur revalide les fichiers par empreinte de contenu (ETag), pas par date. Si le jeu ne démarre pas, l'appli vide son cache et se recharge toute seule, une seule fois. L'option « Vider le cache et recharger » existe aussi dans le menu Ortie → Paramètres. L'installation exige que le site soit servi en **https** (c'est le cas sur Railway, Coolify, etc.).
+**Mises à jour fiables.** Les fichiers du jeu sont chargés avec leur numéro de version (`style.css?v=1.25`, `app.js?v=1.25`…). Une nouvelle page ne peut donc jamais utiliser un ancien style ou un ancien code resté en cache, que ce soit sur le téléphone, dans l'appli installée ou chez l'hébergeur. **À chaque nouvelle version, changer le numéro à trois endroits** : `APP_VERSION` dans `app.js`, `VERSION` dans `sw.js` et les `?v=` de `index.html` (sept fichiers, dont `sound.js`, `online.js` et `achievements.js`). Un test (`npm test`) vérifie qu'ils sont identiques. Le serveur revalide les fichiers par empreinte de contenu (ETag), pas par date. Si le jeu ne démarre pas, l'appli vide son cache et se recharge toute seule, une seule fois. L'option « Vider le cache et recharger » existe aussi dans le menu Ortie → Paramètres. L'installation exige que le site soit servi en **https** (c'est le cas sur Railway, Coolify, etc.).
 
 ## Déploiement avec Nixpacks
 
@@ -65,12 +65,12 @@ Le menu est rangé en sections séparées : **Jouer** (partie solo, à deux, à 
     - iPhone : Apple ne laisse aucun lien ouvrir une appli de l'écran d'accueil. La page propose donc « Copier le code », puis Jouer à distance → Rejoindre → Coller dans l'appli.
   - Mêmes 9 cartes pour les deux, chacun pose ses cartes **à son rythme**, sans attendre l'autre. En haut du plateau, la pastille de l'adversaire montre en direct sa carte, son score et s'il est en ligne (point vert).
   - Une fois son verger terminé, on peut toucher la pastille pour suivre le verger de l'autre en direct. Quand les deux ont fini, le résultat s'affiche chez les deux joueurs ; « Revanche » relance une manche avec de nouvelles cartes, « Rejouer ces cartes » avec les mêmes.
-  - On peut fermer l'appli ou recharger la page : la partie reprend où elle en était. « Annuler » fonctionne pour ses propres coups. Le serveur vérifie chaque coup avec le moteur de règles. Une nouvelle partie solo ou à deux quitte la partie à distance (l'adversaire le voit).
+  - On peut fermer l'appli ou recharger la page : la partie reprend où elle en était. Le serveur vérifie chaque coup avec le moteur de règles. Une nouvelle partie solo ou à deux quitte la partie à distance (l'adversaire le voit).
 - **Achievements** : 58 défis à réussir, en bronze, argent, or et un platine (« Maître d'Ortie », tous les autres réunis). Ils sont rangés par thème : premiers pas, belles récoltes, recettes, assiduité, à plusieurs, secrets (12 achievements cachés). Certains sont très durs : 90 fruits (et 100 en secret), 4 dés à 6 ou 5 Paniers en même temps, objectif atteint 5 parties d'affilée, 5 victoires à distance d'affilée, 250 parties, 10 000 fruits, 30 jours de jeu…
   - **Récompenses** : 18 objets exclusifs de Personnaliser se gagnent avec les achievements. Ce sont 5 fonds (Damier, Feuille d'or, Aurore boréale, Velours royal, Cosmos), 5 designs de cartes (Braises, Givre, Verger doré, Arc-en-ciel, Diamant), 4 styles de dés (Bois, Cristal, Or massif, Obsidienne) et 4 couleurs d'interface (Émeraude, Royal, Minuit, Diamant). Avant d'être gagnés, ils apparaissent avec un 🔒 ; un toucher indique l'achievement à réussir. Gagnés, ils portent un 🏆. La liste des achievements indique la récompense de chacun.
   - La liste montre les achievements réussis (avec leur date), ceux qui restent à faire (avec une barre de progression pour les compteurs : « 4 / 10 parties »…) et les **secrets**, cachés (« ??? ») tant qu'ils ne sont pas réussis. Filtres : Tous, Réussis, À faire, Secrets. Total de points et statistiques (parties, meilleur score, moyenne, fruits récoltés, recettes, paniers, jours de jeu, parties à deux et à distance).
   - Dès qu'un achievement est réussi, une **fenêtre surgissante** l'annonce sur l'écran principal, avec un petit son (même par-dessus la fenêtre de fin de partie) ; plusieurs achievements obtenus d'un coup sont annoncés ensemble. Un toucher dessus ouvre la liste. La fin de partie récapitule aussi les nouveaux achievements, et un point doré sur le logo signale ceux qu'on n'a pas encore regardés.
-  - Les compteurs ne comptent qu'une fois par partie, même après « Annuler ». Tout est gardé sur l'appareil (`public/achievements.js`, testé dans `test/achievements.test.js`).
+  - Les compteurs ne comptent qu'une fois par partie. Tout est gardé sur l'appareil (`public/achievements.js`, testé dans `test/achievements.test.js`).
 - **Personnaliser**, rangé en quatre onglets (Général, Terrain, Cartes, Dés) pour éviter de longs défilements, avec les boutons « 🎲 Au hasard » (combinaison surprise) et « ↺ Par défaut » :
   - **Thème** : automatique (comme le téléphone), clair ou sombre.
   - **Couleurs de l'interface** : Verger, Océan, Prune, Framboise, Cacao (titres, boutons, score ; adaptées au thème sombre).
@@ -90,7 +90,7 @@ Tout le son est synthétisé dans le navigateur (`public/sound.js`, Web Audio) :
 - **Effets** :
   - choisir, tourner et poser une carte (« toc » de bois) ;
   - les dés (la note monte avec la valeur), le Panier et la Brouette (roue et fanfare) ;
-  - l'Écureuil, une pose impossible, l'annulation, une recette réussie, un achievement ;
+  - l'Écureuil, une pose impossible, une recette réussie, un achievement ;
   - le changement de joueur, la victoire et la fin de partie.
 - Les navigateurs n'autorisent le son qu'après un premier toucher : la musique démarre au premier geste.
 - **Règles du jeu** et **Installer l'appli**.
@@ -107,8 +107,8 @@ Le jeton **Brouette** prend la couleur du fruit qui l'a remplie (orange, jaune o
 - Les textes de la barre du bas tiennent toujours sur une ligne : la police rétrécit si besoin, pour que l'écran ne change jamais de taille.
 - Le bouton **Télécharger** disparaît quand l'appli est installée. Sur Chrome, Edge et Android, il n'apparaît que si le navigateur propose vraiment l'installation. Sur iPhone et Safari, qui ne permettent pas de le détecter, le bouton « Elle est déjà installée » du guide le masque ; un lien « installer l'appli » reste dans les règles.
 - Sur téléphone, l'écran est fixe comme une application : le plateau ne bouge jamais pendant qu'on déplace une carte. Le score et la réserve s'affichent en haut ; un toucher ouvre le panneau « Détails » (score, recettes, réserve).
-- Chaque case recouverte affiche le dé obtenu, ou une croix rouge si la pose est interdite. Le nombre de fruits gagnés s'affiche sur la carte et sur le bouton **Poser**.
-- **Annuler** revient sur le dernier coup. La partie est sauvegardée automatiquement.
+- **À vous de calculer**, comme avec les vraies cartes. Pendant le placement, le jeu indique seulement si la pose est possible : contour vert, orange avec l'Écureuil, rouge si elle est interdite, avec une croix sur la case qui bloque. Il ne montre ni les dés obtenus ni le nombre de fruits gagnés. La carte est transparente pour qu'on voie les arbres et les dés qu'elle recouvre. Le gain s'affiche **après** la pose (« +7 fruits », Panier, Brouette, recette réussie).
+- **Pas d'annulation** : une carte posée reste posée (sinon on pourrait poser, regarder le score, annuler et réessayer ailleurs). La partie est sauvegardée automatiquement.
 
 ## Points à vérifier
 

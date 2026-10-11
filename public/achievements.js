@@ -76,7 +76,7 @@
     { id: 'jours_30', cat: 'assiduite', tier: 'or', icon: '🗓️', name: 'Un mois au verger', desc: 'Jouer 30 jours différents.', stat: 'days', goal: 30 },
     { id: 'vannier', cat: 'assiduite', tier: 'argent', icon: 'svg:basket', name: 'Vannier', desc: 'Finir des parties avec 25 Paniers en jeu au total (la Brouette compte).', stat: 'baskets', goal: 25 },
     { id: 'jours_7', cat: 'assiduite', tier: 'argent', icon: '📅', name: 'Fidèle au verger', desc: 'Jouer 7 jours différents.', stat: 'days', goal: 7, reward: [R('board', 'aurora', 'Aurore boréale')] },
-    { id: 'sans_filet', cat: 'assiduite', tier: 'argent', icon: '🤸', name: 'Sans filet', desc: 'Poser les 9 cartes sans jamais annuler un coup.', reward: [R('accent', 'emeraude', 'Émeraude')] },
+    { id: 'sans_filet', cat: 'assiduite', tier: 'argent', icon: '🤸', name: 'Sans filet', desc: 'Finir les 9 cartes avec 45 fruits ou plus, sans l’aide de l’Écureuil.', reward: [R('accent', 'emeraude', 'Émeraude')] },
     { id: 'defi_releve', cat: 'assiduite', tier: 'argent', icon: '🔁', name: 'Défi relevé', desc: 'Rejouer les mêmes cartes et battre son propre score.' },
 
     { id: 'duo', cat: 'multi', tier: 'bronze', icon: '👥', name: 'En famille', desc: 'Terminer une partie à deux sur le même appareil.' },
@@ -97,7 +97,7 @@
     { id: 'duo_choc', cat: 'secrets', tier: 'argent', icon: '🐿️', name: 'Duo de choc', desc: 'Dans une même partie, utiliser l’Écureuil et faire entrer la Brouette.', secret: true },
     { id: 'sur_le_fil', cat: 'secrets', tier: 'argent', icon: '🪡', name: 'Sur le fil', desc: 'Finir une partie avec Recettes pile sur l’objectif.', secret: true },
     { id: 'photo_finish', cat: 'secrets', tier: 'argent', icon: '📸', name: 'Photo-finish', desc: 'Gagner une partie à distance d’un seul fruit.', secret: true },
-    { id: 'hesitant', cat: 'secrets', tier: 'bronze', icon: '🤔', name: 'Hésitant', desc: 'Annuler 10 coups dans une même partie.', secret: true },
+    { id: 'hesitant', cat: 'secrets', tier: 'bronze', icon: '🤔', name: 'Hésitant', desc: 'Tourner une carte 20 fois avant de la poser.', secret: true },
     { id: 'leve_tot', cat: 'secrets', tier: 'bronze', icon: '🌅', name: 'Lève-tôt', desc: 'Terminer une partie entre 5 h et 7 h du matin.', secret: true },
 
     { id: 'maitre', cat: 'legende', tier: 'platine', icon: '💎', name: 'Maître d’Ortie', desc: 'Réussir tous les autres achievements.', reward: [R('cards', 'diamond', 'Diamant'), R('accent', 'diamant', 'Diamant')] },
@@ -174,9 +174,8 @@
    *   mode   : 'solo' | 'duo' | 'online'
    *   states : vergers joués sur cet appareil (les deux à deux sur le même appareil)
    *   result : 'win' | 'lose' | 'tie' | null (à distance : pour moi ; à deux : 'tie' ou null)
-   *   undos  : nombre de coups annulés pendant la partie
    *   first  : première fois que cette partie se termine (les compteurs ne
-   *            comptent qu'une fois, même après « Annuler » puis une autre fin)
+   *            comptent qu'une fois, même si la fin est revue après un rechargement)
    *   now, hour, day ('AAAA-MM-JJ')
    */
   function onGameEnd(d, g) {
@@ -194,7 +193,7 @@
       if (complete && !Object.values(st.board).some((e) => e.die && e.cell.k === 'clear')) ids.push('zero_pourri');
       if (complete && sc.total < 20) ids.push('jardin_zen');
       if (st.endReason === 'blocked') ids.push('impasse');
-      if (complete && !g.undos) ids.push('sans_filet');
+      if (complete && !st.squirrelUsed && sc.total >= 45) ids.push('sans_filet');
       const bonus = sc.recipes.filter((r) => !r.mult);
       const done = bonus.filter((r) => r.done);
       if (done.length) ids.push('premiere_recette');
@@ -206,7 +205,6 @@
       }
       if (sc.target != null && sc.total === sc.target) ids.push('sur_le_fil');
       if (H.TYPES.some((t) => sc.scored[t] >= 40)) ids.push('monochrome');
-      if (g.undos >= 10) ids.push('hesitant');
       if (g.first) {
         if (sc.target != null) { // série d'objectifs atteints avec Recettes
           s.recipeStreak = sc.won ? s.recipeStreak + 1 : 0;

@@ -15,7 +15,7 @@ function playGame(seed, recipes) {
   }
   return st;
 }
-const end = (d, g) => A.onGameEnd(d, Object.assign({ mode: 'solo', result: null, undos: 0, first: true, now: 1000, hour: 14, day: '2026-10-10' }, g));
+const end = (d, g) => A.onGameEnd(d, Object.assign({ mode: 'solo', result: null, first: true, now: 1000, hour: 14, day: '2026-10-10' }, g));
 
 test('liste des succès : identifiants uniques, catégories, paliers et objectifs cohérents', () => {
   const ids = new Set(A.LIST.map((a) => a.id));
@@ -64,12 +64,13 @@ test('fin de partie solo : succès de score, compteurs comptés une seule fois',
   const total = H.score(st).total;
   const got = end(d, { states: [st] });
   assert.ok(got.includes('premier_verger'));
-  if (st.endReason === 'complete') assert.ok(got.includes('verger_complet') && got.includes('sans_filet'));
+  if (st.endReason === 'complete') assert.ok(got.includes('verger_complet'));
+  assert.strictEqual(got.includes('sans_filet'), st.endReason === 'complete' && !st.squirrelUsed && total >= 45);
   for (const a of A.LIST.filter((x) => x.score)) assert.strictEqual(!!d.unlocked[a.id], total >= a.score, a.id);
   assert.strictEqual(d.stats.games, 1);
   assert.strictEqual(d.stats.fruits, total);
   assert.strictEqual(d.stats.best, total);
-  // même partie terminée à nouveau (après « Annuler ») : pas de double comptage
+  // même fin revue (rechargement juste après la fin) : pas de double comptage
   end(d, { states: [st], first: false });
   assert.strictEqual(d.stats.games, 1);
   assert.strictEqual(d.stats.fruits, total);
@@ -78,9 +79,13 @@ test('fin de partie solo : succès de score, compteurs comptés une seule fois',
 test('Sans filet, Impasse, Jardin zen, Oiseau de nuit, jours de jeu', () => {
   const d = A.newData();
   const st = playGame('17');
-  end(d, { states: [st], undos: 2, hour: 3, day: '2026-10-10' });
-  assert.ok(!d.unlocked.sans_filet);
+  end(d, { states: [st], hour: 3, day: '2026-10-10' });
   assert.ok(d.unlocked.oiseau_nuit);
+  // Sans filet : 9 cartes, 45 fruits ou plus, sans l'Écureuil
+  const fort = Object.assign({}, playGame('4242'));
+  const okFort = fort.endReason === 'complete' && H.score(fort).total >= 45;
+  assert.strictEqual(end(A.newData(), { states: [Object.assign({}, fort, { squirrelUsed: false })] }).includes('sans_filet'), okFort);
+  assert.ok(!end(A.newData(), { states: [Object.assign({}, fort, { squirrelUsed: true })] }).includes('sans_filet'));
   end(d, { states: [st], day: '2026-10-10' });
   end(d, { states: [st], day: '2026-10-11' });
   assert.strictEqual(d.stats.days, 2);
@@ -176,9 +181,10 @@ test('fin de partie : sur le fil, monochrome, hésitant, lève-tôt, photo-finis
   r1.target = keep + (sc.total - sc.target);
   assert.ok(end(d, { states: [exact] }).includes('sur_le_fil'));
   r1.target = keep;
-  // hésitant (10 annulations) et lève-tôt (6 h)
-  const got = end(A.newData(), { states: [st], undos: 10, hour: 6 });
-  assert.ok(got.includes('hesitant') && got.includes('leve_tot') && !got.includes('sans_filet'));
+  // lève-tôt (6 h) ; hésitant (20 rotations) est un évènement de l'appli
+  const got = end(A.newData(), { states: [st], hour: 6 });
+  assert.ok(got.includes('leve_tot') && !got.includes('hesitant'));
+  assert.deepStrictEqual(A.onEvent(A.newData(), 'hesitant', 1), ['hesitant']);
   // monochrome : un fruit à 40 ou plus
   assert.strictEqual(end(A.newData(), { states: [st] }).includes('monochrome'), H.TYPES.some((t) => sc.scored[t] >= 40));
   // photo-finish : victoire à distance d'un seul fruit

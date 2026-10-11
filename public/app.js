@@ -4,7 +4,7 @@
   const H = window.OrtieCore;
   const S = 100; // taille d'une case en unités SVG
   const CW = H.CARD_W * S, CH = H.CARD_H * S;
-  const APP_VERSION = '1.24';
+  const APP_VERSION = '1.25';
   const STORE_KEY = 'ortie.save.v3';
   const OLD_STORE_KEY = 'ortie.save.v2';
   const SEEN_KEY = 'ortie.seenRules';
@@ -97,8 +97,8 @@
     btnDetails: $('btn-details'), btnSideClose: $('btn-side-close'), sideBackdrop: $('side-backdrop'), boardWrap: document.querySelector('.board-wrap'), scoreRank: $('score-rank'), scoreRows: $('score-rows'), objective: $('objective'),
     recipes: $('recipes'), recipeList: $('recipe-list'), recipeBar: $('recipe-bar'), recipePop: $('recipe-pop'), seed: $('seed-label'), turn: $('turn-label'),
     hint: $('hint'), toast: $('toast'),
-    btnUndo: $('btn-undo'), btnNew: $('btn-new'), btnPlace: $('btn-place'),
-    placeLabel: $('place-label'), placeGain: $('place-gain'),
+    btnNew: $('btn-new'), btnPlace: $('btn-place'),
+    placeLabel: $('place-label'),
     btnRotL: $('btn-rot-l'), btnRotR: $('btn-rot-r'),
     dlgNew: $('dlg-new'), dlgEnd: $('dlg-end'), dlgRules: $('dlg-rules'), dlgSquirrel: $('dlg-squirrel'),
     inSeed: $('in-seed'), inRecipes: $('in-recipes'), inR1: $('in-r1'), inR2: $('in-r2'), recipePick: $('recipe-pick'),
@@ -119,7 +119,6 @@
   // toujours celui du joueur affiché.
   let match = null;
   let state = null;
-  let history = [];
   const isDuo = () => !!match && match.mode === 'duo';
   // À distance : chacun joue sur son appareil ; match.me = ma place (0 ou 1).
   const isOnline = () => !!match && match.mode === 'online';
@@ -445,19 +444,15 @@
     for (const ch of ev.changes) {
       if (!ch.covered) continue;
       const cx = ch.x * S + S / 2, cy = ch.y * S + S / 2;
+      // Pas d'aperçu des dés ni du gain : c'est au joueur de calculer ce que
+      // rapporte la pose (la carte est transparente, on voit ce qu'elle recouvre).
       if (ch.conflict) {
         g += `<g class="mark bad" transform="translate(${cx} ${cy})"><circle r="22"/><path d="M-9-9L9 9M9-9L-9 9"/></g>`;
-      } else if (ch.die && ev.ok) {
-        g += dieSvg(ch.die, cx, cy, { scale: ch.cell.k === 'clear' ? 0.6 : 0.72, cls: 'ghost-die' });
       } else if (ch.squirrel) {
         g += `<g class="ghost-die">${squirrelSvg(cx, cy, 0.8)}</g>`;
       } else if (ch.event === 'nodie') {
         g += `<g class="mark none" transform="translate(${cx} ${cy})"><circle r="18"/><path d="M-12 12L12-12"/></g>`;
       }
-    }
-    if (ev.ok) {
-      const gx = (ui.pos.x + fp.w) * S - 8, gy = ui.pos.y * S + 8;
-      g += `<g class="gain-pill ${ev.gain > 0 ? 'pos' : ''}" transform="translate(${gx} ${gy})"><rect x="-56" y="-20" width="64" height="40" rx="20"/><text x="-24" y="8" text-anchor="middle">${ev.gain > 0 ? '+' : ''}${ev.gain}</text></g>`;
     }
     host.innerHTML = g;
     updateControls(ev);
@@ -469,7 +464,6 @@
     els.btnPlace.disabled = !(ev && ev.ok);
     els.btnPlace.classList.toggle('warn', !!(ev && ev.ok && ev.usesSquirrel));
     els.placeLabel.textContent = ev && ev.ok && ev.usesSquirrel ? 'Poser avec l’Écureuil' : 'Poser';
-    els.placeGain.textContent = ev && ev.ok ? (ev.gain > 0 ? '+' : '') + ev.gain : '';
     let msg, cls = '';
     if (state.over) msg = 'Partie terminée. Lancez une nouvelle partie quand vous voulez.';
     else if (!sel) msg = state.placed.length === 1 ? 'Choisissez une carte de votre main pour commencer.' : 'Choisissez votre prochaine carte.';
@@ -504,16 +498,10 @@
     fitText(els.hint, narrow ? 13 : 14, 9);
     const L = els.placeLabel;
     const clipped = () => L.scrollWidth > L.clientWidth + 1;
-    els.placeGain.style.display = '';
     fitText(L, narrow ? 16 : 17, 11);
-    // Écran très étroit : libellé court, puis gain masqué (il reste affiché sur la carte),
-    // plutôt qu'un texte coupé ou un bouton qui change de taille.
+    // Écran très étroit : libellé court plutôt qu'un texte coupé ou un bouton qui change de taille.
     if (clipped() && L.textContent === 'Poser avec l’Écureuil') {
       L.textContent = 'Poser (Écureuil)';
-      fitText(L, narrow ? 16 : 17, 10);
-    }
-    if (clipped()) {
-      els.placeGain.style.display = 'none';
       fitText(L, narrow ? 16 : 17, 10);
     }
     fitText(els.boardHelp, narrow ? 12 : 13, 9);
@@ -620,7 +608,6 @@
       els.recipeList.innerHTML = sc.recipes.map((x) => recipeCardHtml(H.RECIPE_BY_ID[x.id], x)).join('');
     } else els.recipes.hidden = true;
 
-    els.btnUndo.disabled = history.length === 0;
     renderPlayers();
     renderRecipeBar(sc);
   }
@@ -880,6 +867,7 @@
 
   function rotate(d) {
     if (ui.sel == null || state.over) return;
+    ui.turns = (ui.turns || 0) + 1; // achievement secret « Hésitant »
     const oldFp = H.footprint(H.cardById(ui.sel), ui.rot);
     ui.rot = (ui.rot + d + 4) & 3;
     if (ui.pos) {
@@ -965,13 +953,12 @@
 
   function doPlace(withSquirrel) {
     if (ui.locked) return;
-    const before = isOnline() ? JSON.stringify(state) : JSON.stringify(match);
     const doneBefore = recipesDone(state);
     const res = H.play(state, ui.sel, ui.rot, ui.pos.x, ui.pos.y, { allowSquirrel: withSquirrel });
     if (!res.ok) { toast(res.reason, 'bad'); return; }
     achSaved(A.onMove(ach, { state, res, now: Date.now() }));
-    history.push(before);
-    if (history.length > 30) history.shift();
+    if (ui.turns >= 20) achSaved(A.onEvent(ach, 'hesitant'));
+    ui.turns = 0;
     const evs = res.changes.map((c) => c.event);
     ui.popKeys = res.changes.filter((c) => c.die && ['new', 'up', 'basket', 'barrow'].includes(c.event)).map((c) => c.k);
     sfx('place');
@@ -1041,40 +1028,6 @@
     ui.sel = null; ui.pos = null; ui.fresh = false;
     computeView();
     renderAll();
-  }
-
-  function undo() {
-    if (!history.length) return;
-    if (isOnline()) {
-      if (allOver()) { toast('La partie est terminée.'); return; }
-      clearTimeout(ui.turnTimer);
-      match.cur = match.me;
-      match.undos = (match.undos || 0) + 1;
-      myPlayer().state = JSON.parse(history.pop());
-      syncState();
-      ui.locked = false;
-      ui.sel = null; ui.pos = null;
-      computeView();
-      save();
-      renderAll();
-      pushMoves();
-      sfx('undo');
-      toast('Coup annulé.');
-      return;
-    }
-    clearTimeout(ui.turnTimer);
-    if (els.dlgTurn.open) { ui.skipTurnClose = true; els.dlgTurn.close(); }
-    const keep = { undos: (match.undos || 0) + 1, achDone: match.achDone };
-    match = Object.assign(JSON.parse(history.pop()), keep);
-    syncState();
-    ui.locked = false;
-    ui.sel = null; ui.pos = null; ui.endShown = false;
-    if (els.dlgEnd.open) els.dlgEnd.close();
-    computeView();
-    save();
-    renderAll();
-    sfx('undo');
-    toast(isDuo() ? `Coup annulé · à ${curPlayer().name} de jouer.` : 'Coup annulé.');
   }
 
   let toastTimer = null;
@@ -1181,7 +1134,6 @@
         : [{ name: 'Vous', color: PLAYER_COLORS[0], state: mk() }],
     };
     syncState();
-    history = [];
     clearTimeout(ui.turnTimer);
     ui.locked = false;
     ui.sel = null; ui.pos = null; ui.rot = 0; ui.endShown = false; ui.fresh = true;
@@ -1194,7 +1146,7 @@
   }
 
   function save() {
-    try { localStorage.setItem(STORE_KEY, JSON.stringify({ match, history: history.slice(-15) })); } catch (e) { /* stockage indisponible */ }
+    try { localStorage.setItem(STORE_KEY, JSON.stringify({ match })); } catch (e) { /* stockage indisponible */ }
   }
   const validState = (st) => st && st.board && Array.isArray(st.placed) && Array.isArray(st.hand);
   function load() {
@@ -1202,14 +1154,12 @@
       const d = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
       if (d && d.match && Array.isArray(d.match.players) && d.match.players.length && d.match.players.every((p) => validState(p.state))) {
         match = d.match;
-        history = Array.isArray(d.history) ? d.history : [];
       } else {
         // ancienne sauvegarde (solo)
         const o = JSON.parse(localStorage.getItem(OLD_STORE_KEY) || 'null');
         if (!o || !validState(o.state)) return false;
         match = { mode: 'solo', cur: 0, players: [{ name: 'Vous', color: PLAYER_COLORS[0], state: o.state }] };
-        history = [];
-      }
+          }
       if (!(match.cur >= 0 && match.cur < match.players.length)) match.cur = 0;
       if (match.mode === 'online' && !(match.code && match.token && (match.me === 0 || match.me === 1) && match.players.length === 2)) match.mode = 'duo';
       if (match.mode === 'online') match.cur = match.me; // on revient toujours sur son propre verger
@@ -1379,7 +1329,6 @@
   els.btnRotL.addEventListener('click', () => rotate(-1));
   els.btnRotR.addEventListener('click', () => rotate(1));
   els.btnPlace.addEventListener('click', tryPlace);
-  els.btnUndo.addEventListener('click', undo);
 
   function openNew(mode) {
     els.inSeed.value = '';
@@ -1455,7 +1404,7 @@
     const ids = A.onGameEnd(ach, {
       mode: isOnline() ? 'online' : isDuo() ? 'duo' : 'solo',
       states: isOnline() ? [myPlayer().state] : match.players.map((p) => p.state),
-      result, margin, undos: match.undos || 0, first, now: d.getTime(), hour: d.getHours(), day,
+      result, margin, first, now: d.getTime(), hour: d.getHours(), day,
     });
     save();
     achSaved(ids);
@@ -1662,7 +1611,6 @@
     const mine = myPlayer();
     match = { mode: 'solo', cur: 0, players: [{ name: 'Vous', color: PLAYER_COLORS[0], state: mine.state }] };
     syncState();
-    history = [];
     ui.locked = false;
   }
 
@@ -1689,7 +1637,6 @@
     match.cur = match.me;
     myPlayer().state = replayState(match.seed, match.recipes, (snap.players[match.me] || {}).moves);
     syncState();
-    history = [];
     computeView();
     save();
     renderAll();
@@ -1722,7 +1669,6 @@
       })),
     };
     syncState();
-    history = [];
     clearTimeout(ui.turnTimer);
     ui.locked = false;
     ui.sel = null; ui.pos = null; ui.rot = 0; ui.fresh = true;
@@ -2155,7 +2101,6 @@
   document.addEventListener('keydown', (e) => {
     if (document.querySelector('dialog[open]')) return;
     if (e.target && /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); return; }
     const k = e.key.toLowerCase();
     if (k === '?') { openDialog(els.dlgRules); return; }
     if (k === '1' || k === '2') { const id = state.hand[Number(k) - 1]; if (id) selectCard(id); }
