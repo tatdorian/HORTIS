@@ -146,8 +146,11 @@ body.kbd .brand:focus-visible { outline: 3px solid var(--accent); outline-offset
 .btn.icon { width: 44px; height: 44px; padding: 0; font-size: 22px; background: var(--surface); border-color: var(--line); color: var(--brand); }
 .btn.big { min-height: 52px; height: 52px; padding: 0 22px; font-size: 17px; white-space: nowrap; min-width: 0; }
 #place-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 0 1 auto; }
+.btn.big .gain { flex: none; }
 .install-link { color: var(--brand); font-weight: 700; text-decoration: underline; }
 .btn .ico { font-size: 16px; line-height: 1; }
+.gain { background: rgba(255,255,255,.25); border-radius: 999px; padding: 1px 9px; font-size: 15px; }
+.gain:empty { display: none; }
 .rot-group { display: flex; gap: 6px; }
 
 /* ------------------------------------------------------------ Mise en page */
@@ -282,8 +285,8 @@ body[data-board="cosmos"] .board-wrap, .swatch[data-board="cosmos"] {
 .tray, .top { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .sheet-head, .side-backdrop, .details-chip { display: none; }
 .board .last { fill: none; stroke: #fff6d8; stroke-width: 5; stroke-dasharray: 12 9; opacity: .85; pointer-events: none; }
-.board .ghost-card { opacity: .6; pointer-events: none; } /* transparente : on voit les arbres et les dés qu'elle recouvre */
-.board .ghost-card.bad { opacity: .45; }
+.board .ghost-card { opacity: .9; pointer-events: none; }
+.board .ghost-card.bad { opacity: .7; }
 .board .ghost-frame { fill: none; stroke-width: 9; pointer-events: none; transform-box: fill-box; transform-origin: center; }
 .board .ghost-frame.ok { stroke: #2fd06a; }
 .board .ghost-frame.warn { stroke: #f2a91f; }
@@ -294,6 +297,9 @@ body[data-board="cosmos"] .board-wrap, .swatch[data-board="cosmos"] {
 .board .mark.bad path { stroke: #fff; stroke-width: 5; stroke-linecap: round; }
 .board .mark.none circle { fill: rgba(60, 60, 60, .55); stroke: #fff; stroke-width: 2; }
 .board .mark.none path { stroke: #fff; stroke-width: 4; stroke-linecap: round; }
+.board .gain-pill rect { fill: rgba(34, 48, 31, .9); stroke: #fff; stroke-width: 2.5; }
+.board .gain-pill.pos rect { fill: #2e8b48; }
+.board .gain-pill text { fill: #fff; font: 800 24px 'Nunito', sans-serif; }
 .board .fresh, .board .pop, .board .ghost-card { transform-box: fill-box; transform-origin: center; }
 .board .ghost-card.spin-r { animation: spin-r .22s ease-out; }
 .board .ghost-card.spin-l { animation: spin-l .22s ease-out; }

@@ -4,7 +4,7 @@
   const H = window.OrtieCore;
   const S = 100; // taille d'une case en unités SVG
   const CW = H.CARD_W * S, CH = H.CARD_H * S;
-  const APP_VERSION = '1.25';
+  const APP_VERSION = '1.26';
   const STORE_KEY = 'ortie.save.v3';
   const OLD_STORE_KEY = 'ortie.save.v2';
   const SEEN_KEY = 'ortie.seenRules';
@@ -98,7 +98,7 @@
     recipes: $('recipes'), recipeList: $('recipe-list'), recipeBar: $('recipe-bar'), recipePop: $('recipe-pop'), seed: $('seed-label'), turn: $('turn-label'),
     hint: $('hint'), toast: $('toast'),
     btnNew: $('btn-new'), btnPlace: $('btn-place'),
-    placeLabel: $('place-label'),
+    placeLabel: $('place-label'), placeGain: $('place-gain'),
     btnRotL: $('btn-rot-l'), btnRotR: $('btn-rot-r'),
     dlgNew: $('dlg-new'), dlgEnd: $('dlg-end'), dlgRules: $('dlg-rules'), dlgSquirrel: $('dlg-squirrel'),
     inSeed: $('in-seed'), inRecipes: $('in-recipes'), inR1: $('in-r1'), inR2: $('in-r2'), recipePick: $('recipe-pick'),
@@ -444,15 +444,19 @@
     for (const ch of ev.changes) {
       if (!ch.covered) continue;
       const cx = ch.x * S + S / 2, cy = ch.y * S + S / 2;
-      // Pas d'aperçu des dés ni du gain : c'est au joueur de calculer ce que
-      // rapporte la pose (la carte est transparente, on voit ce qu'elle recouvre).
       if (ch.conflict) {
         g += `<g class="mark bad" transform="translate(${cx} ${cy})"><circle r="22"/><path d="M-9-9L9 9M9-9L-9 9"/></g>`;
+      } else if (ch.die && ev.ok) {
+        g += dieSvg(ch.die, cx, cy, { scale: ch.cell.k === 'clear' ? 0.6 : 0.72, cls: 'ghost-die' });
       } else if (ch.squirrel) {
         g += `<g class="ghost-die">${squirrelSvg(cx, cy, 0.8)}</g>`;
       } else if (ch.event === 'nodie') {
         g += `<g class="mark none" transform="translate(${cx} ${cy})"><circle r="18"/><path d="M-12 12L12-12"/></g>`;
       }
+    }
+    if (ev.ok) {
+      const gx = (ui.pos.x + fp.w) * S - 8, gy = ui.pos.y * S + 8;
+      g += `<g class="gain-pill ${ev.gain > 0 ? 'pos' : ''}" transform="translate(${gx} ${gy})"><rect x="-56" y="-20" width="64" height="40" rx="20"/><text x="-24" y="8" text-anchor="middle">${ev.gain > 0 ? '+' : ''}${ev.gain}</text></g>`;
     }
     host.innerHTML = g;
     updateControls(ev);
@@ -464,6 +468,7 @@
     els.btnPlace.disabled = !(ev && ev.ok);
     els.btnPlace.classList.toggle('warn', !!(ev && ev.ok && ev.usesSquirrel));
     els.placeLabel.textContent = ev && ev.ok && ev.usesSquirrel ? 'Poser avec l’Écureuil' : 'Poser';
+    els.placeGain.textContent = ev && ev.ok ? (ev.gain > 0 ? '+' : '') + ev.gain : '';
     let msg, cls = '';
     if (state.over) msg = 'Partie terminée. Lancez une nouvelle partie quand vous voulez.';
     else if (!sel) msg = state.placed.length === 1 ? 'Choisissez une carte de votre main pour commencer.' : 'Choisissez votre prochaine carte.';
@@ -498,10 +503,16 @@
     fitText(els.hint, narrow ? 13 : 14, 9);
     const L = els.placeLabel;
     const clipped = () => L.scrollWidth > L.clientWidth + 1;
+    els.placeGain.style.display = '';
     fitText(L, narrow ? 16 : 17, 11);
-    // Écran très étroit : libellé court plutôt qu'un texte coupé ou un bouton qui change de taille.
+    // Écran très étroit : libellé court, puis gain masqué (il reste affiché sur la carte),
+    // plutôt qu'un texte coupé ou un bouton qui change de taille.
     if (clipped() && L.textContent === 'Poser avec l’Écureuil') {
       L.textContent = 'Poser (Écureuil)';
+      fitText(L, narrow ? 16 : 17, 10);
+    }
+    if (clipped()) {
+      els.placeGain.style.display = 'none';
       fitText(L, narrow ? 16 : 17, 10);
     }
     fitText(els.boardHelp, narrow ? 12 : 13, 9);
@@ -1159,7 +1170,7 @@
         const o = JSON.parse(localStorage.getItem(OLD_STORE_KEY) || 'null');
         if (!o || !validState(o.state)) return false;
         match = { mode: 'solo', cur: 0, players: [{ name: 'Vous', color: PLAYER_COLORS[0], state: o.state }] };
-          }
+      }
       if (!(match.cur >= 0 && match.cur < match.players.length)) match.cur = 0;
       if (match.mode === 'online' && !(match.code && match.token && (match.me === 0 || match.me === 1) && match.players.length === 2)) match.mode = 'duo';
       if (match.mode === 'online') match.cur = match.me; // on revient toujours sur son propre verger
